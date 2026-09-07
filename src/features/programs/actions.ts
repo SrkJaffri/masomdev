@@ -105,6 +105,71 @@ export async function getProgramPosterMediaAction(): Promise<ProgramPosterMedia[
   return listProgramPosterMedia();
 }
 
+export type DeletePosterResult =
+  | { ok: true }
+  | { ok: false; error: string; inUse?: boolean; usedBy?: string[] };
+
+/**
+ * Deletes ONE poster object from the `programs` bucket.
+ *
+ * The reference check is deliberately FRESH: `programs.poster_path` is
+ * re-queried for the exact storage name immediately before removal, so a stale
+ * picker can never delete an image that a program started referencing after the
+ * library was listed. The check fails closed — if the reference query errors,
+ * the image is kept. Storage removal targets only the exact object name (no
+ * folder, no partial/prefix matches, no automatic duplicate handling).
+ */
+export async function deleteProgramPosterAction(name: string): Promise<DeletePosterResult> {
+  await requireAdmin();
+
+  const target = name.trim();
+  if (!SAFE_POSTER_NAME_RE.test(target)) {
+    return { ok: false, error: "Unable to delete this image. Please try again." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  // Fresh server-side reference check — never trust the client's usage count.
+  const { data: referencing, error: refError } = await supabase
+    .from("programs")
+    .select("title")
+    .eq("poster_path", target);
+
+  if (refError) {
+    logCmsError("programs:deleteMedia:refs", refError);
+    return { ok: false, error: "Unable to delete this image. Please try again." };
+  }
+
+  const usedBy = (referencing ?? [])
+    .map((row) => (row as { title: string | null }).title)
+    .filter((title): title is string => Boolean(title));
+
+  if (usedBy.length > 0) {
+    return {
+      ok: false,
+      error: "This image is currently being used by a Program and cannot be deleted.",
+      inUse: true,
+      usedBy,
+    };
+  }
+
+  // Delete only the exact object. If it is already gone (removed out-of-band),
+  // treat the deletion as accomplished — the library no longer contains it.
+  const { error: removeError } = await supabase.storage.from(BUCKET).remove([target]);
+  if (removeError) {
+    const { data: stillExists, error: existsError } = await supabase.storage
+      .from(BUCKET)
+      .exists(target);
+    if (existsError || stillExists !== false) {
+      logCmsError("programs:deleteMedia", removeError);
+      return { ok: false, error: "Unable to delete this image. Please try again." };
+    }
+  }
+
+  await logAdminActivity("program", "media deleted", null, target);
+  return { ok: true };
+}
+
 export async function createProgram(
   _prev: ActionResult,
   formData: FormData,

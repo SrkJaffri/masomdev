@@ -1,9 +1,24 @@
 "use client";
 
 import Image from "next/image";
-import { CheckIcon, ImagesIcon, SearchIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ImagesIcon,
+  Loader2Icon,
+  SearchIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +29,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { getProgramPosterMediaAction } from "@/features/programs/actions";
+import {
+  deleteProgramPosterAction,
+  getProgramPosterMediaAction,
+} from "@/features/programs/actions";
 import type { ProgramPosterMedia } from "@/features/programs/types";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +67,15 @@ export function MediaLibraryDialog({
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [pickedName, setPickedName] = useState<string | null>(null);
 
+  // Delete flow: the item awaiting confirmation, the in-flight flag, fresh
+  // server-side usage reported at confirm time (stale picker case), and any
+  // user-facing error. `notice` is the transient success message.
+  const [deleteTarget, setDeleteTarget] = useState<ProgramPosterMedia | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteBlockedBy, setDeleteBlockedBy] = useState<string[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
   const loadMedia = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
@@ -81,6 +108,57 @@ export function MediaLibraryDialog({
     }
   }, [items, open, currentName]);
 
+  // Closing the picker discards any pending delete confirmation.
+  useEffect(() => {
+    if (open) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+    setDeleteBlockedBy(null);
+  }, [open]);
+
+  // The success notice fades out on its own.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 3200);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const requestDelete = useCallback((item: ProgramPosterMedia) => {
+    setDeleteTarget(item);
+    setDeleteError(null);
+    setDeleteBlockedBy(null);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deleteProgramPosterAction(deleteTarget.name);
+      if (result.ok) {
+        // Remove the card immediately, keep search text + scroll, and clear the
+        // selection only if the deleted image was the one picked.
+        setItems((current) =>
+          current.filter((item) => item.name !== deleteTarget.name),
+        );
+        setPickedName((current) => (current === deleteTarget.name ? null : current));
+        setNotice("Image deleted successfully.");
+        setDeleteTarget(null);
+      } else if (result.inUse) {
+        // A Program started referencing the image after the library loaded —
+        // the fresh server-side check wins over the stale picker data.
+        setDeleteBlockedBy(result.usedBy ?? []);
+        setDeleteError(result.error);
+      } else {
+        setDeleteError(result.error);
+      }
+    } catch {
+      setDeleteError("Unable to delete this image. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, deleting]);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return items;
@@ -92,6 +170,12 @@ export function MediaLibraryDialog({
 
   const visibleItems = filtered.slice(0, visible);
   const picked = pickedName ? items.find((item) => item.name === pickedName) ?? null : null;
+
+  // The confirmation dialog shows usage from the latest data available: the
+  // server's fresh check at confirm time (if any) beats the picker snapshot.
+  const deleteUsedBy = deleteBlockedBy ?? deleteTarget?.usedBy ?? [];
+  const deleteInUse =
+    deleteTarget !== null && (deleteBlockedBy !== null || deleteTarget.usedBy.length > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,6 +235,15 @@ export function MediaLibraryDialog({
               />
             </div>
 
+            {notice ? (
+              <p
+                role="status"
+                className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-xs font-medium text-success"
+              >
+                {notice}
+              </p>
+            ) : null}
+
             {filtered.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
                 No posters found
@@ -162,54 +255,66 @@ export function MediaLibraryDialog({
                 {visibleItems.map((item) => {
                   const selected = item.name === pickedName;
                   return (
-                    <button
-                      key={item.name}
-                      type="button"
-                      onClick={() => setPickedName(item.name)}
-                      aria-pressed={selected}
-                      aria-label={`Select poster ${item.name}`}
-                      className={cn(
-                        "group overflow-hidden rounded-xl border bg-card text-left outline-none transition-all",
-                        "focus-visible:ring-3 focus-visible:ring-ring/50",
-                        selected
-                          ? "border-ring ring-2 ring-ring/60"
-                          : "border-border/60 hover:border-foreground/30",
-                      )}
-                    >
-                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-                        <Image
-                          src={item.url}
-                          alt={item.name}
-                          fill
-                          sizes="(min-width: 768px) 200px, 45vw"
-                          loading="lazy"
-                          decoding="async"
-                          className="object-cover"
-                        />
-                        {selected ? (
-                          <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                            <CheckIcon className="size-4" />
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="space-y-0.5 p-2">
-                        <p
-                          className="truncate text-xs font-medium text-foreground"
-                          title={item.name}
-                        >
-                          {item.name}
-                        </p>
-                        {item.usedBy.length > 0 ? (
+                    <div key={item.name} className="group relative">
+                      <button
+                        type="button"
+                        onClick={() => setPickedName(item.name)}
+                        aria-pressed={selected}
+                        aria-label={`Select poster ${item.name}`}
+                        className={cn(
+                          "w-full overflow-hidden rounded-xl border bg-card text-left outline-none transition-all",
+                          "focus-visible:ring-3 focus-visible:ring-ring/50",
+                          selected
+                            ? "border-ring ring-2 ring-ring/60"
+                            : "border-border/60 hover:border-foreground/30",
+                        )}
+                      >
+                        <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
+                          <Image
+                            src={item.url}
+                            alt={item.name}
+                            fill
+                            sizes="(min-width: 768px) 200px, 45vw"
+                            loading="lazy"
+                            decoding="async"
+                            className="object-cover"
+                          />
+                          {selected ? (
+                            <span className="absolute top-2 left-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                              <CheckIcon className="size-4" />
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="space-y-0.5 p-2">
                           <p
-                            className="truncate text-[11px] text-muted-foreground"
-                            title={`Used by ${item.usedBy.join(", ")}`}
+                            className="truncate text-xs font-medium text-foreground"
+                            title={item.name}
                           >
-                            Used by {item.usedBy.length}{" "}
-                            {item.usedBy.length === 1 ? "program" : "programs"}
+                            {item.name}
                           </p>
-                        ) : null}
-                      </div>
-                    </button>
+                          {item.usedBy.length > 0 ? (
+                            <p
+                              className="truncate text-[11px] text-muted-foreground"
+                              title={`Used by ${item.usedBy.join(", ")}`}
+                            >
+                              Used by {item.usedBy.length}{" "}
+                              {item.usedBy.length === 1 ? "program" : "programs"}
+                            </p>
+                          ) : null}
+                        </div>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Delete image"
+                        aria-label={`Delete poster ${item.name}`}
+                        onClick={() => requestDelete(item)}
+                        className="absolute top-2 right-2 z-10 bg-background/85 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-background hover:text-destructive md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                      >
+                        <Trash2Icon className="size-3.5" />
+                      </Button>
+                    </div>
                   );
                 })}
               </div>
@@ -251,6 +356,100 @@ export function MediaLibraryDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Delete confirmation. Never deletes without an explicit destructive
+          confirm, and the server re-checks references at delete time. */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !deleting) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+            setDeleteBlockedBy(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          {deleteTarget ? (
+            deleteInUse ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Image in use</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {deleteTarget.name} is currently used by{" "}
+                    {deleteUsedBy.length}{" "}
+                    {deleteUsedBy.length === 1 ? "Program" : "Programs"} and
+                    cannot be deleted.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                {deleteUsedBy.length > 0 ? (
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {deleteUsedBy.map((title) => (
+                      <li key={title} className="flex gap-1.5">
+                        <span aria-hidden="true">•</span>
+                        <span className="truncate" title={title}>
+                          {title}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <p className="text-sm text-muted-foreground">
+                  Remove or replace those Program poster references before
+                  deleting this image.
+                </p>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Close</AlertDialogCancel>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete image?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You&apos;re about to permanently delete:
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <p
+                  className="truncate rounded-lg border border-border bg-muted/50 px-3 py-2 font-mono text-xs text-foreground"
+                  title={deleteTarget.name}
+                >
+                  {deleteTarget.name}
+                </p>
+                <AlertDialogDescription>
+                  This image is not currently used by any Program. This action
+                  cannot be undone.
+                </AlertDialogDescription>
+                {deleteError ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                  >
+                    {deleteError}
+                  </p>
+                ) : null}
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={deleting}
+                    onClick={() => void confirmDelete()}
+                  >
+                    {deleting ? (
+                      <Loader2Icon
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    {deleting ? "Deleting…" : "Delete Image"}
+                  </Button>
+                </AlertDialogFooter>
+              </>
+            )
+          ) : null}
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
