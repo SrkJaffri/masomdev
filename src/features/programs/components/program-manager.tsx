@@ -40,12 +40,13 @@ type DialogState =
 
 type ProgramAction = typeof createProgram;
 
-/** UTC-safe "Aug 20, 2026" for an ISO date string. */
+/** UTC-safe "Friday, Sep 4, 2026" for an ISO date string. */
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const [year, month, day] = iso.split("-").map(Number);
   if (!year || !month || !day) return iso;
   return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+    weekday: "long",
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -270,7 +271,7 @@ export function ProgramManager({ programs }: { programs: ProgramAdminItem[] }) {
               <TableRow>
                 <TableHead className="w-20">Poster</TableHead>
                 <TableHead>Program</TableHead>
-                <TableHead className="w-32">Date</TableHead>
+                <TableHead className="w-44">Date</TableHead>
                 <TableHead className="w-44">Time</TableHead>
                 <TableHead className="w-24">Status</TableHead>
                 <TableHead className="w-24 text-right">Actions</TableHead>
