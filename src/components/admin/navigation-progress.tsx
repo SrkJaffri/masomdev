@@ -5,8 +5,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-/** Slight delay so instantly-cached navigations never flash the bar. */
-const SHOW_DELAY_MS = 120;
+/**
+ * Delay so instantly-cached navigations never flash the bar. Aligned with the
+ * route-loading fallback (see admin/(dashboard)/loading.tsx): for the first
+ * ~200ms only the clicked nav item shows pending feedback; the bar fades in
+ * for slower round-trips.
+ */
+const SHOW_DELAY_MS = 180;
 /** Safety cap so the bar can never get stuck after a cancelled navigation. */
 const MAX_VISIBLE_MS = 8000;
 

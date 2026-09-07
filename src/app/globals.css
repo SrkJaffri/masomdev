@@ -92,6 +92,21 @@
       transform: translateX(260%);
     }
   }
+
+  /* Admin route-loading fallback: held invisible for the first 450ms (pure
+     CSS, no timers) so typical ~300–450ms client navigations never flash a
+     skeleton — the current page stays visible while the next RSC payload
+     loads. Only genuinely slower routes see it fade in. */
+  --animate-admin-skeleton: masom-admin-skeleton-in 0.18s ease-out 0.45s both;
+
+  @keyframes masom-admin-skeleton-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 /* Custom cursor (desktop, fine-pointer devices only). The JS component adds
@@ -298,5 +313,11 @@ html.theme-transition *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Reduced-motion users see the admin loading fallback immediately (no
+     invisible wait), without any fade motion. */
+  .animate-admin-skeleton {
+    animation-delay: 0s !important;
   }
 }
