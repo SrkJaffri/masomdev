@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { heroSlides } from "@/features/home/data/hero-slides";
 import { logCmsError } from "@/lib/cms/logging";
 import { CMS_BUCKETS, resolveImageSrc } from "@/lib/media/storage";
@@ -119,10 +121,15 @@ export async function getAllBanners(): Promise<BannerAdminItem[]> {
  * Lightweight admin counts (total + active) for the dashboard stat cards.
  * Selects only the flags — no full-table payloads, no image resolution.
  */
-export async function getBannerCounts(): Promise<{
+/**
+ * Lightweight admin counts (total + active) for the dashboard stat cards and
+ * the sidebar badges. Wrapped in React cache() so the admin layout and the
+ * dashboard page share ONE fetch per request instead of duplicating it.
+ */
+export const getBannerCounts = cache(async (): Promise<{
   total: number;
   active: number;
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("banners")
@@ -137,7 +144,7 @@ export async function getBannerCounts(): Promise<{
     total: rows.length,
     active: rows.filter((row) => row.is_active).length,
   };
-}
+});
 
 export async function getBannerById(id: string): Promise<BannerRow | null> {
   const supabase = await createSupabaseServerClient();

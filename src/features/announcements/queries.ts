@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { logCmsError } from "@/lib/cms/logging";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -68,10 +70,15 @@ export async function getAllAnnouncements(): Promise<AnnouncementAdminItem[]> {
  * Lightweight admin counts (total + active) for the dashboard stat cards.
  * Selects only the flags — no full-row payloads.
  */
-export async function getAnnouncementCounts(): Promise<{
+/**
+ * Lightweight admin counts (total + active) for the dashboard stat cards and
+ * the sidebar badges. Wrapped in React cache() so the admin layout and the
+ * dashboard page share ONE fetch per request instead of duplicating it.
+ */
+export const getAnnouncementCounts = cache(async (): Promise<{
   total: number;
   active: number;
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("announcements")
@@ -86,7 +93,7 @@ export async function getAnnouncementCounts(): Promise<{
     total: rows.length,
     active: rows.filter((row) => row.is_active).length,
   };
-}
+});
 
 export async function getAnnouncementById(id: string): Promise<AnnouncementRow | null> {
   const supabase = await createSupabaseServerClient();

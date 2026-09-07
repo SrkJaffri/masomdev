@@ -38,6 +38,49 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 24;
 
+/** "Sep 7, 2026" from the storage listing's upload timestamp, or null. */
+function formatUploadDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Human-readable file size ("84 KB", "1.2 MB"), or null when unknown. */
+function formatFileSize(bytes: number | null): string | null {
+  if (bytes === null || Number.isNaN(bytes) || bytes < 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb >= 100 ? Math.round(kb) : kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * One muted footer line per card: "Uploaded Sep 7, 2026 · 84 KB". Both pieces
+ * come from the storage listing already in hand — no extra requests. Renders
+ * nothing when the listing carries neither timestamp nor size.
+ */
+function MediaMetaLine({ item }: { item: ProgramPosterMedia }) {
+  const date = formatUploadDate(item.createdAt);
+  const size = formatFileSize(item.sizeBytes);
+  const label = [date ? `Uploaded ${date}` : null, size]
+    .filter(Boolean)
+    .join(" · ");
+  if (!label) return null;
+  return (
+    <p
+      className="truncate text-[11px] text-muted-foreground"
+      title={label}
+    >
+      {label}
+    </p>
+  );
+}
+
 type MediaLibraryDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -301,6 +344,7 @@ export function MediaLibraryDialog({
                               {item.usedBy.length === 1 ? "program" : "programs"}
                             </p>
                           ) : null}
+                          <MediaMetaLine item={item} />
                         </div>
                       </button>
                       <Button

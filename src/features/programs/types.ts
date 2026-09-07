@@ -27,7 +27,10 @@ export type ProgramPosterFile = {
   name: string;
   /** Public URL used for thumbnails/previews. */
   url: string;
+  /** Upload timestamp (ISO) from the storage listing. */
   createdAt: string | null;
+  /** File size in bytes from the storage listing metadata; null if unknown. */
+  sizeBytes: number | null;
 };
 
 /** Poster file enriched with the programs that currently reference it. */

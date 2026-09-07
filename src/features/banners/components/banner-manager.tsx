@@ -3,6 +3,7 @@
 import { PencilIcon, PlusIcon } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminThumb } from "@/components/admin/admin-thumb";
 import { DeleteConfirm } from "@/components/admin/delete-confirm";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -273,22 +274,23 @@ function BannerDialog({ state, onClose }: { state: DialogState; onClose: () => v
 }
 
 export function BannerManager({ banners }: { banners: BannerAdminItem[] }) {
-  const [dialog, setDialog] = useState<DialogState>(null);
+  // "?create=1" (from the dashboard Create-new dropdown / quick actions) opens
+  // the create dialog on mount — the existing form, no duplicated CRUD logic.
+  const [dialog, setDialog] = useState<DialogState>(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("create")
+      ? { mode: "create" }
+      : null,
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Banners</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Hero slider images for the homepage.
-          </p>
-        </div>
+      <AdminPageHeader title="Banners" description="Hero slider images for the homepage.">
         <Button variant="cta" onClick={() => setDialog({ mode: "create" })}>
           <PlusIcon className="size-4" />
           Add banner
         </Button>
-      </div>
+      </AdminPageHeader>
 
       {banners.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">

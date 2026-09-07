@@ -11,7 +11,12 @@ const BUCKET = CMS_BUCKETS.programs;
 const PAGE_SIZE = 100;
 const IMAGE_EXTENSION_RE = /\\.(webp|jpe?g|png)$/i;
 
-type PosterObject = { name: string; createdAt: string | null };
+type PosterObject = {
+  name: string;
+  createdAt: string | null;
+  /** Upload size in bytes; already present in the list response metadata. */
+  sizeBytes: number | null;
+};
 
 function isImageObject(object: {
   name: string;
@@ -53,7 +58,13 @@ export async function listProgramPosterFiles(): Promise<ProgramPosterFile[]> {
       const page = data ?? [];
       for (const object of page) {
         if (isImageObject(object)) {
-          objects.push({ name: object.name, createdAt: object.created_at });
+          objects.push({
+            name: object.name,
+            createdAt: object.created_at,
+            // `metadata.size` is returned by the same list call — no extra
+            // per-image requests needed for the card's file-size line.
+            sizeBytes: object.metadata?.size ?? null,
+          });
         }
       }
       if (page.length < PAGE_SIZE) break;
@@ -69,6 +80,7 @@ export async function listProgramPosterFiles(): Promise<ProgramPosterFile[]> {
     name: object.name,
     url: resolveImageSrc(BUCKET, object.name) ?? "",
     createdAt: object.createdAt,
+    sizeBytes: object.sizeBytes,
   }));
 }
 

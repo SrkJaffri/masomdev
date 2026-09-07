@@ -251,8 +251,15 @@ function EventDialog({ state, onClose }: { state: DialogState; onClose: () => vo
   );
 }
 
-export function EventManager({ events }: { events: CalendarEventAdminItem[] }) {
-  const [dialog, setDialog] = useState<DialogState>(null);
+export function EventManager({
+  events,
+  autoCreate = false,
+}: {
+  events: CalendarEventAdminItem[];
+  /** Open the create dialog on mount (?create=1 from the dashboard dropdown). */
+  autoCreate?: boolean;
+}) {
+  const [dialog, setDialog] = useState<DialogState>(autoCreate ? { mode: "create" } : null);
   const [month, setMonth] = useState(0); // 0 = all
 
   const visibleEvents = useMemo(

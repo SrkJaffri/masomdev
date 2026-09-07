@@ -1,11 +1,10 @@
-import Link from "next/link";
-import { ExternalLinkIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { AdminNav } from "@/components/admin/admin-nav";
-import { AdminThemeToggle } from "@/components/admin/admin-theme";
-import { NavigationProgress } from "@/components/admin/navigation-progress";
-import { SignOutButton } from "@/components/admin/sign-out-button";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { getAnnouncementCounts } from "@/features/announcements/queries";
+import { getBannerCounts } from "@/features/banners/queries";
+import { getCalendarEventCounts } from "@/features/calendar/queries";
+import { getProgramCounts } from "@/features/programs/queries";
 import { requireAdmin } from "@/features/auth/guard";
 
 export default async function AdminDashboardLayout({
@@ -15,42 +14,32 @@ export default async function AdminDashboardLayout({
 }) {
   const { user } = await requireAdmin();
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      <NavigationProgress />
-      <header className="border-b border-border/60 bg-card">
-        <div className="container-page flex flex-wrap items-center justify-between gap-3 py-3">
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="flex items-center gap-2">
-              <span className="text-xs font-bold tracking-[0.24em] text-brand-600 uppercase">
-                MASOM
-              </span>
-              <span className="text-sm font-semibold text-foreground">Admin</span>
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground sm:flex"
-            >
-              View site
-              <ExternalLinkIcon className="size-3.5" />
-            </Link>
-            <span className="hidden max-w-[180px] truncate text-sm text-muted-foreground md:inline">
-              {user.email}
-            </span>
-            <AdminThemeToggle />
-            <SignOutButton />
-          </div>
-        </div>
-        <div className="container-page pb-3">
-          <AdminNav />
-        </div>
-      </header>
+  // The four lean count queries are React-cached, so the sidebar badges and the
+  // dashboard stat cards share ONE fetch per request — no duplicate counts.
+  const [banners, programs, announcements, calendarEvents] = await Promise.all([
+    getBannerCounts(),
+    getProgramCounts(),
+    getAnnouncementCounts(),
+    getCalendarEventCounts(),
+  ]);
 
-      <main className="container-page py-8">{children}</main>
-    </div>
+  const metadataName =
+    typeof user.user_metadata?.name === "string" && user.user_metadata.name.trim() !== ""
+      ? user.user_metadata.name.trim()
+      : null;
+
+  return (
+    <AdminShell
+      userEmail={user.email ?? ""}
+      displayName={metadataName ?? "Administrator"}
+      counts={{
+        banners: banners.total,
+        programs: programs.total,
+        announcements: announcements.total,
+        calendar: calendarEvents.total,
+      }}
+    >
+      {children}
+    </AdminShell>
   );
 }

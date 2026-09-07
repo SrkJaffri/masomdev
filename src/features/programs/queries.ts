@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { upcomingPrograms } from "@/features/home/data/programs";
 import { logCmsError } from "@/lib/cms/logging";
 import { CMS_BUCKETS, resolveImageSrc } from "@/lib/media/storage";
@@ -240,10 +242,15 @@ export async function getProgramYears(): Promise<number[]> {
  * Lightweight admin counts (total + published) for the dashboard stat cards.
  * Selects only the flags — no full-row payloads.
  */
-export async function getProgramCounts(): Promise<{
+/**
+ * Lightweight admin counts (total + published) for the dashboard stat cards and
+ * the sidebar badges. Wrapped in React cache() so the admin layout and the
+ * dashboard page share ONE fetch per request instead of duplicating it.
+ */
+export const getProgramCounts = cache(async (): Promise<{
   total: number;
   published: number;
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("programs")
@@ -258,7 +265,7 @@ export async function getProgramCounts(): Promise<{
     total: rows.length,
     published: rows.filter((row) => row.is_published).length,
   };
-}
+});
 
 export async function getProgramById(id: string): Promise<ProgramRow | null> {
   const supabase = await createSupabaseServerClient();

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { prayerTimeLabels } from "@/features/prayer-calendar/config";
 import { formatStoredTime } from "@/features/prayer-calendar/lib/next-prayer";
 import type { DailyPrayerTimings, PrayerTimeSlot } from "@/features/prayer-calendar/types";
@@ -359,10 +361,15 @@ export async function getTodayTimings(): Promise<DailyPrayerTimings> {
  * Lightweight admin counts (total + active) for the dashboard stat cards.
  * Selects only the flags — avoids the Hijri month/override joins entirely.
  */
-export async function getCalendarEventCounts(): Promise<{
+/**
+ * Lightweight admin counts (total + active) for the dashboard stat cards and
+ * the sidebar badges. Wrapped in React cache() so the admin layout and the
+ * dashboard page share ONE fetch per request instead of duplicating it.
+ */
+export const getCalendarEventCounts = cache(async (): Promise<{
   total: number;
   active: number;
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("calendar_events")
@@ -377,7 +384,7 @@ export async function getCalendarEventCounts(): Promise<{
     total: rows.length,
     active: rows.filter((row) => row.is_active).length,
   };
-}
+});
 
 export async function getAllCalendarDays(year: number): Promise<CalendarDayAdminItem[]> {
   const supabase = await createSupabaseServerClient();
