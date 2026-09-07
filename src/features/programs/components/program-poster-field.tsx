@@ -28,13 +28,11 @@ export function ProgramPosterField({
   hasCurrentPoster,
   currentPosterUrl,
   currentPosterAlt,
-  media,
 }: {
   isEdit: boolean;
   hasCurrentPoster: boolean;
   currentPosterUrl: string | null;
   currentPosterAlt: string;
-  media: ProgramPosterMedia[];
 }) {
   // Default: create -> upload; edit with a poster -> keep current.
   const [tab, setTab] = useState<PosterTab>(
@@ -212,7 +210,6 @@ export function ProgramPosterField({
           setLibraryOpen(open);
           if (!open && libraryItem) setTab("library");
         }}
-        items={media}
         currentName={libraryItem?.name ?? null}
         onSelect={(item) => {
           setLibraryItem(item);

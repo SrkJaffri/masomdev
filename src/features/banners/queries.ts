@@ -115,6 +115,30 @@ export async function getAllBanners(): Promise<BannerAdminItem[]> {
   });
 }
 
+/**
+ * Lightweight admin counts (total + active) for the dashboard stat cards.
+ * Selects only the flags — no full-table payloads, no image resolution.
+ */
+export async function getBannerCounts(): Promise<{
+  total: number;
+  active: number;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("banners")
+    .select("is_active");
+
+  if (error) {
+    logCmsError("banners:counts", error);
+    return { total: 0, active: 0 };
+  }
+  const rows = (data ?? []) as Array<{ is_active: boolean }>;
+  return {
+    total: rows.length,
+    active: rows.filter((row) => row.is_active).length,
+  };
+}
+
 export async function getBannerById(id: string): Promise<BannerRow | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

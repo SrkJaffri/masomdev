@@ -9,8 +9,10 @@ import type { ActionResult } from "@/lib/cms/validation";
 import { CMS_BUCKETS, deleteImage, uploadImage } from "@/lib/media/storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { listProgramPosterMedia } from "./media";
 import { getProgramById } from "./queries";
 import { programFormSchema } from "./schema";
+import type { ProgramPosterMedia } from "./types";
 
 const BUCKET = CMS_BUCKETS.programs;
 
@@ -90,6 +92,17 @@ async function deletePosterIfUnused(
   if (!path) return;
   const references = await countOtherPosterReferences(path, excludeProgramId);
   if (references === 0) await deleteImage(BUCKET, path);
+}
+
+/**
+ * Lazily loads the Program Media Library (storage listing + usage) on demand
+ * instead of on every /admin/programs page load. Called by the client when the
+ * admin opens "Choose from media library". Returns [] on any failure (the
+ * picker shows an empty/retry state) — never throws to the browser.
+ */
+export async function getProgramPosterMediaAction(): Promise<ProgramPosterMedia[]> {
+  await requireAdmin();
+  return listProgramPosterMedia();
 }
 
 export async function createProgram(

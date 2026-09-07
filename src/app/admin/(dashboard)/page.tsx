@@ -18,10 +18,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getAllAnnouncements } from "@/features/announcements/queries";
-import { getAllBanners } from "@/features/banners/queries";
-import { getAllCalendarEvents } from "@/features/calendar/queries";
-import { getAllPrograms } from "@/features/programs/queries";
+import { getAnnouncementCounts } from "@/features/announcements/queries";
+import { getBannerCounts } from "@/features/banners/queries";
+import { getCalendarEventCounts } from "@/features/calendar/queries";
+import { getProgramCounts } from "@/features/programs/queries";
 import { requireAdmin } from "@/features/auth/guard";
 import { getLatestLogin, getRecentActivity } from "@/lib/cms/activity";
 
@@ -39,10 +39,10 @@ export default async function AdminDashboardPage() {
 
   const [banners, programs, announcements, calendarEvents, recentActivity, latestLogin] =
     await Promise.all([
-      getAllBanners(),
-      getAllPrograms(),
-      getAllAnnouncements(),
-      getAllCalendarEvents(),
+      getBannerCounts(),
+      getProgramCounts(),
+      getAnnouncementCounts(),
+      getCalendarEventCounts(),
       getRecentActivity(5),
       getLatestLogin(user.id),
     ]);
@@ -54,32 +54,32 @@ export default async function AdminDashboardPage() {
       label: "Banners",
       href: "/admin/banners",
       icon: ImageIcon,
-      total: banners.length,
-      liveCount: banners.filter((banner) => banner.is_active).length,
+      total: banners.total,
+      liveCount: banners.active,
       liveLabel: "active",
     },
     {
       label: "Programs",
       href: "/admin/programs",
       icon: CalendarDaysIcon,
-      total: programs.length,
-      liveCount: programs.filter((program) => program.is_published).length,
+      total: programs.total,
+      liveCount: programs.published,
       liveLabel: "published",
     },
     {
       label: "Announcements",
       href: "/admin/announcements",
       icon: MegaphoneIcon,
-      total: announcements.length,
-      liveCount: announcements.filter((announcement) => announcement.is_active).length,
+      total: announcements.total,
+      liveCount: announcements.active,
       liveLabel: "active",
     },
     {
       label: "Calendar",
       href: "/admin/calendar",
       icon: CalendarIcon,
-      total: calendarEvents.length,
-      liveCount: calendarEvents.filter((event) => event.is_active).length,
+      total: calendarEvents.total,
+      liveCount: calendarEvents.active,
       liveLabel: "active events",
     },
   ];

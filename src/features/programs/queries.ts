@@ -236,6 +236,30 @@ export async function getProgramYears(): Promise<number[]> {
   }
 }
 
+/**
+ * Lightweight admin counts (total + published) for the dashboard stat cards.
+ * Selects only the flags — no full-row payloads.
+ */
+export async function getProgramCounts(): Promise<{
+  total: number;
+  published: number;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("programs")
+    .select("is_published");
+
+  if (error) {
+    logCmsError("programs:counts", error);
+    return { total: 0, published: 0 };
+  }
+  const rows = (data ?? []) as Array<{ is_published: boolean }>;
+  return {
+    total: rows.length,
+    published: rows.filter((row) => row.is_published).length,
+  };
+}
+
 export async function getProgramById(id: string): Promise<ProgramRow | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

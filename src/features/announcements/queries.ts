@@ -64,6 +64,30 @@ export async function getAllAnnouncements(): Promise<AnnouncementAdminItem[]> {
   return (data as AnnouncementRow[] | null) ?? [];
 }
 
+/**
+ * Lightweight admin counts (total + active) for the dashboard stat cards.
+ * Selects only the flags — no full-row payloads.
+ */
+export async function getAnnouncementCounts(): Promise<{
+  total: number;
+  active: number;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("announcements")
+    .select("is_active");
+
+  if (error) {
+    logCmsError("announcements:counts", error);
+    return { total: 0, active: 0 };
+  }
+  const rows = (data ?? []) as Array<{ is_active: boolean }>;
+  return {
+    total: rows.length,
+    active: rows.filter((row) => row.is_active).length,
+  };
+}
+
 export async function getAnnouncementById(id: string): Promise<AnnouncementRow | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

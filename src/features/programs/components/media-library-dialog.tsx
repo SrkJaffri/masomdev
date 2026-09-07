@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { CheckIcon, SearchIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CheckIcon, ImagesIcon, SearchIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { getProgramPosterMediaAction } from "@/features/programs/actions";
 import type { ProgramPosterMedia } from "@/features/programs/types";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,6 @@ const PAGE_SIZE = 24;
 type MediaLibraryDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  items: ProgramPosterMedia[];
   /** Storage name currently selected for the program (for the initial ring). */
   currentName?: string | null;
   onSelect: (item: ProgramPosterMedia) => void;
@@ -30,32 +30,56 @@ type MediaLibraryDialogProps = {
 
 /**
  * Admin media library picker. Lists existing program posters from the
- * `programs` storage bucket (fetched server-side by the admin page), with a
- * lightweight client-side filename search and incremental reveal so only a
- * page of thumbnails is in the DOM at once.
+ * `programs` storage bucket. The listing is deliberately LAZY: it is fetched
+ * through a server action only when the dialog opens, so /admin/programs never
+ * pays the Storage listing cost during a plain page load. Thumbnails render
+ * only inside this open dialog (lazy + paged), never on the manager page.
  */
 export function MediaLibraryDialog({
   open,
   onOpenChange,
-  items,
   currentName,
   onSelect,
 }: MediaLibraryDialogProps) {
+  const [items, setItems] = useState<ProgramPosterMedia[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [pickedName, setPickedName] = useState<string | null>(null);
 
-  // Reset search/selection each time the dialog opens.
+  const loadMedia = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const media = await getProgramPosterMediaAction();
+      setItems(media);
+      setLoadedOnce(true);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch the library the first time the dialog opens and reset search on
+  // every open.
   useEffect(() => {
     if (!open) return;
+    if (!loadedOnce) void loadMedia();
     setQuery("");
     setVisible(PAGE_SIZE);
-    setPickedName(
-      currentName && items.some((item) => item.name === currentName)
-        ? currentName
-        : null,
-    );
-  }, [open, items, currentName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentName]);
+
+  // Once items arrive, mark the currently referenced image as picked.
+  useEffect(() => {
+    if (!open || !currentName) return;
+    if (items.some((item) => item.name === currentName)) {
+      setPickedName(currentName);
+    }
+  }, [items, open, currentName]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -80,93 +104,135 @@ export function MediaLibraryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setVisible(PAGE_SIZE);
-            }}
-            placeholder="Search posters…"
-            aria-label="Search posters"
-            className="pl-8"
-          />
-        </div>
-
-        {filtered.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
-            No posters found
-            {query.trim() ? ` for “${query.trim()}”` : ""}. Upload a poster first and
-            it will appear here.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {visibleItems.map((item) => {
-              const selected = item.name === pickedName;
-              return (
-                <button
-                  key={item.name}
-                  type="button"
-                  onClick={() => setPickedName(item.name)}
-                  aria-pressed={selected}
-                  aria-label={`Select poster ${item.name}`}
-                  className={cn(
-                    "group overflow-hidden rounded-xl border bg-card text-left outline-none transition-all",
-                    "focus-visible:ring-3 focus-visible:ring-ring/50",
-                    selected
-                      ? "border-ring ring-2 ring-ring/60"
-                      : "border-border/60 hover:border-foreground/30",
-                  )}
-                >
-                  <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-                    <Image
-                      src={item.url}
-                      alt={item.name}
-                      fill
-                      sizes="(min-width: 768px) 200px, 45vw"
-                      loading="lazy"
-                      decoding="async"
-                      className="object-cover"
-                    />
-                    {selected ? (
-                      <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                        <CheckIcon className="size-4" />
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="space-y-0.5 p-2">
-                    <p
-                      className="truncate text-xs font-medium text-foreground"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </p>
-                    {item.usedBy.length > 0 ? (
-                      <p
-                        className="truncate text-[11px] text-muted-foreground"
-                        title={`Used by ${item.usedBy.join(", ")}`}
-                      >
-                        Used by {item.usedBy.length}{" "}
-                        {item.usedBy.length === 1 ? "program" : "programs"}
-                      </p>
-                    ) : null}
-                  </div>
-                </button>
-              );
-            })}
+        {loading ? (
+          <div
+            role="status"
+            aria-label="Loading posters"
+            className="grid grid-cols-2 gap-3 py-8 sm:grid-cols-3 md:grid-cols-4"
+          >
+            {Array.from({ length: 8 }, (_, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-xl border border-border/60 bg-muted/40"
+              >
+                <div className="aspect-[4/5] w-full animate-pulse bg-muted" />
+                <div className="h-3 w-3/4 animate-pulse rounded bg-muted p-2" />
+              </div>
+            ))}
           </div>
+        ) : loadError ? (
+          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Could not load the media library. Please try again.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => void loadMedia()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setVisible(PAGE_SIZE);
+                }}
+                placeholder="Search posters…"
+                aria-label="Search posters"
+                className="pl-8"
+              />
+            </div>
+
+            {filtered.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
+                No posters found
+                {query.trim() ? ` for “${query.trim()}”` : ""}. Upload a poster
+                first and it will appear here.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {visibleItems.map((item) => {
+                  const selected = item.name === pickedName;
+                  return (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onClick={() => setPickedName(item.name)}
+                      aria-pressed={selected}
+                      aria-label={`Select poster ${item.name}`}
+                      className={cn(
+                        "group overflow-hidden rounded-xl border bg-card text-left outline-none transition-all",
+                        "focus-visible:ring-3 focus-visible:ring-ring/50",
+                        selected
+                          ? "border-ring ring-2 ring-ring/60"
+                          : "border-border/60 hover:border-foreground/30",
+                      )}
+                    >
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
+                        <Image
+                          src={item.url}
+                          alt={item.name}
+                          fill
+                          sizes="(min-width: 768px) 200px, 45vw"
+                          loading="lazy"
+                          decoding="async"
+                          className="object-cover"
+                        />
+                        {selected ? (
+                          <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                            <CheckIcon className="size-4" />
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="space-y-0.5 p-2">
+                        <p
+                          className="truncate text-xs font-medium text-foreground"
+                          title={item.name}
+                        >
+                          {item.name}
+                        </p>
+                        {item.usedBy.length > 0 ? (
+                          <p
+                            className="truncate text-[11px] text-muted-foreground"
+                            title={`Used by ${item.usedBy.join(", ")}`}
+                          >
+                            Used by {item.usedBy.length}{" "}
+                            {item.usedBy.length === 1 ? "program" : "programs"}
+                          </p>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {visible < filtered.length ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setVisible((count) => count + PAGE_SIZE)}
+              >
+                Load more posters
+              </Button>
+            ) : null}
+          </>
         )}
 
-        {visible < filtered.length ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => setVisible((count) => count + PAGE_SIZE)}
-          >
-            Load more posters
-          </Button>
+        {!loading && !loadError && loadedOnce && items.length === 0 ? (
+          <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <ImagesIcon className="size-3.5" aria-hidden="true" />
+            The library is empty — upload a poster first.
+          </p>
         ) : null}
 
         <DialogFooter>

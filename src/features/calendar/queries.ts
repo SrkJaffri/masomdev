@@ -355,6 +355,30 @@ export async function getTodayTimings(): Promise<DailyPrayerTimings> {
 // Admin reads (session client — RLS enforces admin via is_admin()).
 // ---------------------------------------------------------------------------
 
+/**
+ * Lightweight admin counts (total + active) for the dashboard stat cards.
+ * Selects only the flags — avoids the Hijri month/override joins entirely.
+ */
+export async function getCalendarEventCounts(): Promise<{
+  total: number;
+  active: number;
+}> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("calendar_events")
+    .select("is_active");
+
+  if (error) {
+    logCmsError("calendar:eventCounts", error);
+    return { total: 0, active: 0 };
+  }
+  const rows = (data ?? []) as Array<{ is_active: boolean }>;
+  return {
+    total: rows.length,
+    active: rows.filter((row) => row.is_active).length,
+  };
+}
+
 export async function getAllCalendarDays(year: number): Promise<CalendarDayAdminItem[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

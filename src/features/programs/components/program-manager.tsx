@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createProgram, deleteProgram, updateProgram } from "@/features/programs/actions";
-import type { ProgramAdminItem, ProgramPosterMedia } from "@/features/programs/types";
+import type { ProgramAdminItem } from "@/features/programs/types";
 import { idleResult } from "@/lib/cms/validation";
 
 import { ProgramPosterField } from "./program-poster-field";
@@ -62,13 +62,11 @@ function ProgramForm({
   isEdit,
   program,
   action,
-  media,
   onClose,
 }: {
   isEdit: boolean;
   program: ProgramAdminItem | null;
   action: ProgramAction;
-  media: ProgramPosterMedia[];
   onClose: () => void;
 }) {
   const [result, formAction] = useActionState(action, idleResult);
@@ -152,7 +150,6 @@ function ProgramForm({
         hasCurrentPoster={Boolean(program?.poster_path)}
         currentPosterUrl={program?.previewUrl ?? null}
         currentPosterAlt={program?.title ?? "Current poster"}
-        media={media}
       />
 
       <div className="space-y-2">
@@ -210,11 +207,9 @@ function ProgramForm({
 
 function ProgramDialog({
   state,
-  media,
   onClose,
 }: {
   state: DialogState;
-  media: ProgramPosterMedia[];
   onClose: () => void;
 }) {
   const isEdit = state?.mode === "edit";
@@ -236,7 +231,6 @@ function ProgramDialog({
           isEdit={isEdit}
           program={program}
           action={action}
-          media={media}
           onClose={onClose}
         />
       </DialogContent>
@@ -244,13 +238,7 @@ function ProgramDialog({
   );
 }
 
-export function ProgramManager({
-  programs,
-  media,
-}: {
-  programs: ProgramAdminItem[];
-  media: ProgramPosterMedia[];
-}) {
+export function ProgramManager({ programs }: { programs: ProgramAdminItem[] }) {
   const [dialog, setDialog] = useState<DialogState>(null);
 
   return (
@@ -344,7 +332,7 @@ export function ProgramManager({
         </div>
       )}
 
-      <ProgramDialog state={dialog} media={media} onClose={() => setDialog(null)} />
+      <ProgramDialog state={dialog} onClose={() => setDialog(null)} />
     </div>
   );
 }
