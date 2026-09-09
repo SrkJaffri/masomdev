@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { createBanner, deleteBanner, updateBanner } from "@/features/banners/actions";
 import type { BannerAdminItem, BannerImageSource } from "@/features/banners/types";
+import { HERO_DEFAULTS } from "@/features/home/data/hero-slides";
 import { idleResult, isValidExternalImageUrl } from "@/lib/cms/validation";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +94,25 @@ function BannerForm({
     banner?.image_source === "external" ? (banner.external_url ?? "") : "",
   );
   const [externalBroken, setExternalBroken] = useState(false);
+  // CTA state keeps label/url values alive even while a button is hidden,
+  // so toggling visibility never erases the stored configuration. New banners
+  // start from the approved hero defaults (consistent with the pre-CMS hero).
+  const [showPrimaryCta, setShowPrimaryCta] = useState(banner?.show_primary_cta ?? true);
+  const [primaryLabel, setPrimaryLabel] = useState(
+    banner ? (banner.primary_cta_label ?? "") : HERO_DEFAULTS.primaryCta.label,
+  );
+  const [primaryUrl, setPrimaryUrl] = useState(
+    banner ? (banner.primary_cta_url ?? "") : HERO_DEFAULTS.primaryCta.href,
+  );
+  const [showSecondaryCta, setShowSecondaryCta] = useState(
+    banner?.show_secondary_cta ?? true,
+  );
+  const [secondaryLabel, setSecondaryLabel] = useState(
+    banner ? (banner.secondary_cta_label ?? "") : HERO_DEFAULTS.secondaryCta.label,
+  );
+  const [secondaryUrl, setSecondaryUrl] = useState(
+    banner ? (banner.secondary_cta_url ?? "") : HERO_DEFAULTS.secondaryCta.href,
+  );
 
   useEffect(() => {
     if (result.status === "success") onClose();
@@ -178,19 +199,139 @@ function BannerForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="image_alt">Image description (for accessibility)</Label>
+        <Label htmlFor="eyebrow">Eyebrow (optional)</Label>
         <Input
-          id="image_alt"
-          name="image_alt"
-          defaultValue={banner?.image_alt ?? ""}
-          placeholder="e.g. MASOM community gathering"
-          required
+          id="eyebrow"
+          name="eyebrow"
+          defaultValue={banner ? (banner.eyebrow ?? "") : HERO_DEFAULTS.eyebrow}
+          placeholder="MASOM · Chicago, Illinois"
         />
+        <p className="text-xs text-muted-foreground">
+          Small text displayed above the hero heading.
+        </p>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="title">Title (optional)</Label>
         <Input id="title" name="title" defaultValue={banner?.title ?? ""} />
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="show_title"
+            name="show_title"
+            defaultChecked={banner ? banner.show_title : true}
+          />
+          <Label htmlFor="show_title">Show Heading</Label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Display the banner heading over the image. The stored title is never erased.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Hero Description (optional)</Label>
+        <Textarea
+          id="description"
+          name="description"
+          rows={3}
+          defaultValue={banner?.description ?? ""}
+          placeholder="Visible supporting text displayed over the hero banner."
+        />
+        <p className="text-xs text-muted-foreground">
+          Visible supporting text displayed over the hero banner.
+        </p>
+      </div>
+
+      {/* Primary CTA */}
+      <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-4">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="show_primary_cta"
+            name="show_primary_cta"
+            checked={showPrimaryCta}
+            onCheckedChange={setShowPrimaryCta}
+          />
+          <Label htmlFor="show_primary_cta">Show Primary Button</Label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="primary_cta_label">Button Label</Label>
+            <Input
+              id="primary_cta_label"
+              name="primary_cta_label"
+              value={primaryLabel}
+              onChange={(event) => setPrimaryLabel(event.target.value)}
+              placeholder="View Programs"
+              maxLength={80}
+              disabled={!showPrimaryCta}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="primary_cta_url">Button URL</Label>
+            <Input
+              id="primary_cta_url"
+              name="primary_cta_url"
+              value={primaryUrl}
+              onChange={(event) => setPrimaryUrl(event.target.value)}
+              placeholder="/events-schedule"
+              inputMode="url"
+              disabled={!showPrimaryCta}
+            />
+          </div>
+        </div>
+        {!showPrimaryCta ? (
+          <input type="hidden" name="primary_cta_label" value={primaryLabel} />
+        ) : null}
+        {!showPrimaryCta ? (
+          <input type="hidden" name="primary_cta_url" value={primaryUrl} />
+        ) : null}
+      </div>
+
+      {/* Secondary CTA */}
+      <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-4">
+        <div className="flex items-center gap-3">
+          <Switch
+            id="show_secondary_cta"
+            name="show_secondary_cta"
+            checked={showSecondaryCta}
+            onCheckedChange={setShowSecondaryCta}
+          />
+          <Label htmlFor="show_secondary_cta">Show Secondary Button</Label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="secondary_cta_label">Button Label</Label>
+            <Input
+              id="secondary_cta_label"
+              name="secondary_cta_label"
+              value={secondaryLabel}
+              onChange={(event) => setSecondaryLabel(event.target.value)}
+              placeholder="Prayer Calendar"
+              maxLength={80}
+              disabled={!showSecondaryCta}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="secondary_cta_url">Button URL</Label>
+            <Input
+              id="secondary_cta_url"
+              name="secondary_cta_url"
+              value={secondaryUrl}
+              onChange={(event) => setSecondaryUrl(event.target.value)}
+              placeholder="/hijricalendar2026"
+              inputMode="url"
+              disabled={!showSecondaryCta}
+            />
+          </div>
+        </div>
+        {!showSecondaryCta ? (
+          <input type="hidden" name="secondary_cta_label" value={secondaryLabel} />
+        ) : null}
+        {!showSecondaryCta ? (
+          <input type="hidden" name="secondary_cta_url" value={secondaryUrl} />
+        ) : null}
       </div>
 
       <div className="space-y-2">

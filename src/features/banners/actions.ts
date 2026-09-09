@@ -22,13 +22,43 @@ function revalidateBanners() {
 function parseBannerForm(formData: FormData) {
   return bannerFormSchema.safeParse({
     title: formData.get("title") ?? "",
+    description: formData.get("description") ?? "",
+    eyebrow: formData.get("eyebrow") ?? "",
+    primary_cta_label: formData.get("primary_cta_label") ?? "",
+    primary_cta_url: formData.get("primary_cta_url") ?? "",
+    show_primary_cta: formData.get("show_primary_cta"),
+    secondary_cta_label: formData.get("secondary_cta_label") ?? "",
+    secondary_cta_url: formData.get("secondary_cta_url") ?? "",
+    show_secondary_cta: formData.get("show_secondary_cta"),
     image_alt: formData.get("image_alt") ?? "",
     link_url: formData.get("link_url") ?? "",
     sort_order: formData.get("sort_order") ?? "0",
     is_active: formData.get("is_active"),
+    show_title: formData.get("show_title"),
     image_source: formData.get("image_source") ?? "storage",
     external_url: formData.get("external_url") ?? "",
   });
+}
+
+/**
+ * Alt text is no longer an admin-facing field. Resolve it safely: any value
+ * the payload carries wins (legacy form posts), then the stored value, then
+ * the banner title, then the eyebrow, then a neutral fallback. The visible
+ * hero description is deliberately never used as alt text.
+ */
+function resolveImageAlt(options: {
+  formValue: string | null;
+  storedValue?: string | null;
+  title: string | null;
+  eyebrow: string | null;
+}): string {
+  return (
+    options.formValue?.trim() ||
+    options.storedValue?.trim() ||
+    options.title?.trim() ||
+    options.eyebrow?.trim() ||
+    "MASOM homepage banner"
+  );
 }
 
 export async function createBanner(
@@ -67,14 +97,27 @@ export async function createBanner(
   }
 
   const supabase = await createSupabaseServerClient();
+  const resolvedAlt = resolveImageAlt({
+    formValue: parsed.data.image_alt,
+    title: parsed.data.title,
+    eyebrow: parsed.data.eyebrow,
+  });
   const { data: inserted, error } = await supabase
     .from("banners")
     .insert({
       title: parsed.data.title,
+      description: parsed.data.description,
+      eyebrow: parsed.data.eyebrow,
+      primary_cta_label: parsed.data.primary_cta_label,
+      primary_cta_url: parsed.data.primary_cta_url,
+      show_primary_cta: parsed.data.show_primary_cta,
+      secondary_cta_label: parsed.data.secondary_cta_label,
+      secondary_cta_url: parsed.data.secondary_cta_url,
+      show_secondary_cta: parsed.data.show_secondary_cta,
       image_path: imagePath,
       image_source: parsed.data.image_source,
       external_url: externalUrl,
-      image_alt: parsed.data.image_alt,
+      image_alt: resolvedAlt,
       link_url: parsed.data.link_url,
       sort_order: parsed.data.sort_order,
       is_active: parsed.data.is_active,
@@ -161,14 +204,28 @@ export async function updateBanner(
   }
 
   const supabase = await createSupabaseServerClient();
+  const resolvedAlt = resolveImageAlt({
+    formValue: parsed.data.image_alt,
+    storedValue: existing.image_alt,
+    title: parsed.data.title,
+    eyebrow: parsed.data.eyebrow,
+  });
   const { error } = await supabase
     .from("banners")
     .update({
       title: parsed.data.title,
+      description: parsed.data.description,
+      eyebrow: parsed.data.eyebrow,
+      primary_cta_label: parsed.data.primary_cta_label,
+      primary_cta_url: parsed.data.primary_cta_url,
+      show_primary_cta: parsed.data.show_primary_cta,
+      secondary_cta_label: parsed.data.secondary_cta_label,
+      secondary_cta_url: parsed.data.secondary_cta_url,
+      show_secondary_cta: parsed.data.show_secondary_cta,
       image_path: imagePath,
       image_source: source,
       external_url: externalUrl,
-      image_alt: parsed.data.image_alt,
+      image_alt: resolvedAlt,
       link_url: parsed.data.link_url,
       sort_order: parsed.data.sort_order,
       is_active: parsed.data.is_active,

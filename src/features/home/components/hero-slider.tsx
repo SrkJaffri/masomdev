@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 
 import type { HeroBanner } from "@/features/banners/types";
+import { DEFAULT_HERO_DESCRIPTION, HERO_DEFAULTS } from "@/features/home/data/hero-slides";
 import { cn } from "@/lib/utils";
 
 const AUTOPLAY_MS = 7000;
@@ -71,10 +72,32 @@ export function HeroSlider({ slides }: HeroSliderProps) {
     }
   };
 
-  // Banner-driven headline (first slide by sort order) when the CMS provides a
-  // title; otherwise the institution's name keeps the hero stable and branded.
+  // Banner-driven headline for the ACTIVE slide when the CMS provides a title;
+  // otherwise the institution's name keeps the hero stable and branded. The
+  // heading element itself stays persistent (never re-animates with slides),
+  // and each banner's own Show Heading setting controls whether it renders.
+  const activeSlide = slides[index] ?? slides[0];
   const headline =
-    slides[0]?.title?.trim() || "Midwest Association of Shia Organized Muslims";
+    activeSlide?.title?.trim() || "Midwest Association of Shia Organized Muslims";
+  const showHeading = activeSlide?.showTitle !== false;
+  // Per-banner visible description. Empty/null (an intentionally blank CMS
+  // value) renders no paragraph at all — no empty gap. The approved default
+  // copy applies only when no CMS slide data exists at all.
+  const description =
+    activeSlide == null
+      ? DEFAULT_HERO_DESCRIPTION
+      : (activeSlide.description?.trim() || null);
+  // Per-banner eyebrow and CTA buttons. Null (intentionally empty/hidden)
+  // renders nothing — no element, no decorative line, no wrapper gap. The
+  // approved defaults apply only when no CMS slide data exists at all.
+  const eyebrow =
+    activeSlide == null
+      ? HERO_DEFAULTS.eyebrow
+      : (activeSlide.eyebrow?.trim() || null);
+  const primaryCta =
+    activeSlide == null ? HERO_DEFAULTS.primaryCta : activeSlide.primaryCta;
+  const secondaryCta =
+    activeSlide == null ? HERO_DEFAULTS.secondaryCta : activeSlide.secondaryCta;
 
   return (
     <section
@@ -183,36 +206,47 @@ export function HeroSlider({ slides }: HeroSliderProps) {
             }}
           >
             <div className="max-w-xl pb-16 sm:max-w-2xl sm:pb-20">
-              <p className="flex items-center gap-3 text-[0.7rem] font-bold tracking-[0.22em] text-sand-400 uppercase sm:text-sm">
-                <span
-                  aria-hidden="true"
-                  className="h-px w-8 bg-sand-400/80 sm:w-10"
-                />
-                MASOM · Chicago, Illinois
-              </p>
-              <h1 className="mt-4 text-balance text-3xl leading-[1.12] font-bold text-white sm:text-4xl lg:text-5xl xl:text-[3.35rem]">
-                {headline}
-              </h1>
-              <p className="mt-4 hidden max-w-md text-sm leading-relaxed text-white/85 sm:block sm:text-base">
-                An Imambargah in Chicago serving the Shia community with
-                majalis, Islamic education, programs and services.
-              </p>
-              <div className="pointer-events-auto mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:gap-4">
-                <Link
-                  href="/events-schedule"
-                  className="group inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3.5 text-sm font-bold text-white shadow-card transition-colors duration-200 hover:bg-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900 focus-visible:outline-none active:scale-[0.98] sm:text-base"
-                >
-                  View Programs
-                  <ArrowRightIcon className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                </Link>
-                <Link
-                  href="/hijricalendar2026"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/5 px-6 py-3.5 text-sm font-bold text-white backdrop-blur-sm transition-colors duration-200 hover:border-white/50 hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none active:scale-[0.98] sm:text-base"
-                >
-                  <CalendarDaysIcon className="size-4" />
-                  Prayer Calendar
-                </Link>
-              </div>
+              {eyebrow ? (
+                <p className="flex items-center gap-3 text-[0.7rem] font-bold tracking-[0.22em] text-sand-400 uppercase sm:text-sm">
+                  <span
+                    aria-hidden="true"
+                    className="h-px w-8 bg-sand-400/80 sm:w-10"
+                  />
+                  {eyebrow}
+                </p>
+              ) : null}
+              {showHeading ? (
+                <h1 className="mt-4 text-balance text-3xl leading-[1.12] font-bold text-white sm:text-4xl lg:text-5xl xl:text-[3.35rem]">
+                  {headline}
+                </h1>
+              ) : null}
+              {description ? (
+                <p className="mt-4 hidden max-w-md text-sm leading-relaxed text-white/85 sm:block sm:text-base">
+                  {description}
+                </p>
+              ) : null}
+              {primaryCta || secondaryCta ? (
+                <div className="pointer-events-auto mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center sm:gap-4">
+                  {primaryCta ? (
+                    <Link
+                      href={primaryCta.href}
+                      className="group inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3.5 text-sm font-bold text-white shadow-card transition-colors duration-200 hover:bg-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900 focus-visible:outline-none active:scale-[0.98] sm:text-base"
+                    >
+                      {primaryCta.label}
+                      <ArrowRightIcon className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </Link>
+                  ) : null}
+                  {secondaryCta ? (
+                    <Link
+                      href={secondaryCta.href}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/5 px-6 py-3.5 text-sm font-bold text-white backdrop-blur-sm transition-colors duration-200 hover:border-white/50 hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none active:scale-[0.98] sm:text-base"
+                    >
+                      <CalendarDaysIcon className="size-4" />
+                      {secondaryCta.label}
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </motion.div>
         </div>

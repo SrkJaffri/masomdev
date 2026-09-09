@@ -2,7 +2,11 @@ import "server-only";
 
 import { cache } from "react";
 
-import { heroSlides } from "@/features/home/data/hero-slides";
+import {
+  DEFAULT_HERO_DESCRIPTION,
+  HERO_DEFAULTS,
+  heroSlides,
+} from "@/features/home/data/hero-slides";
 import { logCmsError } from "@/lib/cms/logging";
 import { CMS_BUCKETS, resolveImageSrc } from "@/lib/media/storage";
 import { createSupabasePublicClient } from "@/lib/supabase/public";
@@ -28,6 +32,22 @@ function bannerSrc(
   return resolveImageSrc(BUCKET, row.image_path);
 }
 
+/**
+ * Resolve one CTA for rendering. Hidden or incomplete (missing label/url)
+ * buttons resolve to null — an incomplete button is never rendered as a
+ * malformed empty link.
+ */
+function resolveCta(
+  show: boolean,
+  label: string | null | undefined,
+  href: string | null | undefined,
+): HeroBanner["primaryCta"] {
+  const trimmedLabel = label?.trim();
+  const trimmedHref = href?.trim();
+  if (!show || !trimmedLabel || !trimmedHref) return null;
+  return { label: trimmedLabel, href: trimmedHref };
+}
+
 function toHeroBanner(
   row: Pick<
     BannerRow,
@@ -37,6 +57,15 @@ function toHeroBanner(
     | "external_url"
     | "image_alt"
     | "title"
+    | "show_title"
+    | "description"
+    | "eyebrow"
+    | "primary_cta_label"
+    | "primary_cta_url"
+    | "show_primary_cta"
+    | "secondary_cta_label"
+    | "secondary_cta_url"
+    | "show_secondary_cta"
     | "link_url"
   >,
 ): HeroBanner | null {
@@ -48,6 +77,24 @@ function toHeroBanner(
     src,
     alt: row.image_alt ?? "",
     title: row.title ?? null,
+    // Defensive default ON: a DB that has not yet received the show_title
+    // migration keeps the exact current hero appearance.
+    showTitle: row.show_title !== false,
+    // Null renders nothing — an intentionally empty value never falls back
+    // to generic copy.
+    description: row.description ?? null,
+    eyebrow: row.eyebrow ?? null,
+    // Defensive default ON for the same migration-lag reason as showTitle.
+    primaryCta: resolveCta(
+      row.show_primary_cta !== false,
+      row.primary_cta_label,
+      row.primary_cta_url,
+    ),
+    secondaryCta: resolveCta(
+      row.show_secondary_cta !== false,
+      row.secondary_cta_label,
+      row.secondary_cta_url,
+    ),
     href: row.link_url,
     external: source === "external",
   };
@@ -60,6 +107,12 @@ function fallbackBanners(): HeroBanner[] {
     src: slide.image.src,
     alt: slide.alt,
     title: null,
+    showTitle: true,
+    // CMS unavailable → the approved default hero content keeps it stable.
+    description: DEFAULT_HERO_DESCRIPTION,
+    eyebrow: HERO_DEFAULTS.eyebrow,
+    primaryCta: { ...HERO_DEFAULTS.primaryCta },
+    secondaryCta: { ...HERO_DEFAULTS.secondaryCta },
     href: null,
     external: false,
   }));
@@ -75,7 +128,9 @@ export async function getActiveBanners(): Promise<HeroBanner[]> {
     const supabase = createSupabasePublicClient();
     const { data, error } = await supabase
       .from("banners")
-      .select("id, image_source, image_path, external_url, image_alt, title, link_url")
+      .select(
+        "id, image_source, image_path, external_url, image_alt, title, show_title, description, eyebrow, primary_cta_label, primary_cta_url, show_primary_cta, secondary_cta_label, secondary_cta_url, show_secondary_cta, link_url",
+      )
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
 

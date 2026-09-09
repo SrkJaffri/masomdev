@@ -1,6 +1,26 @@
 import type { HeroSlide } from "@/features/home/types";
 
 /**
+ * Approved default hero blurb. Used only when CMS data is unavailable (local
+ * fallback banners) or no slide is loaded — never forced onto a CMS banner
+ * whose description is intentionally empty.
+ */
+export const DEFAULT_HERO_DESCRIPTION =
+  "An Imambargah in Chicago serving the Shia community with majalis, Islamic education, programs and services.";
+
+/**
+ * Approved default hero eyebrow + CTA buttons. Used to backfill existing rows
+ * in the migration, as fallback-hero values when CMS data is unavailable, and
+ * when no slide is loaded. Never forced onto a CMS banner that intentionally
+ * hides/empties these elements.
+ */
+export const HERO_DEFAULTS = {
+  eyebrow: "MASOM · Chicago, Illinois",
+  primaryCta: { label: "View Programs", href: "/events-schedule" },
+  secondaryCta: { label: "Prayer Calendar", href: "/hijricalendar2026" },
+} as const;
+
+/**
  * Real MASOM banner assets (formerly served through Revolution Slider), stored
  * locally in /public/hero. Swapping this to a Supabase-backed Banner Manager
  * later only requires replacing this array with fetched data of the same shape.
