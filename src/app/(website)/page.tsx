@@ -19,6 +19,15 @@ export const metadata = createMetadata({
   path: "/",
 });
 
+// CMS freshness: banners and announcements must reflect admin changes on the
+// very next request. This renders the homepage on demand instead of serving
+// the build-time static snapshot; the banner/announcement reads themselves
+// additionally bypass the fetch Data Cache (cache: "no-store"). Programs,
+// prayer timings and YouTube keep their tagged/cached fetches, so the extra
+// per-request cost stays at two small Postgres reads.
+
+export const revalidate = 0;
+
 export default async function HomePage() {
   // Fetch CMS content server-side (SEO-friendly). Each query falls back to the
   // built-in reference data when the CMS is unavailable/empty, except the news

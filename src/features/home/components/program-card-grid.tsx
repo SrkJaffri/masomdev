@@ -69,12 +69,16 @@ const AUTOPLAY_MS = 3000;
  * section never becomes an unnecessarily tall block no matter how many programs
  * are upcoming.
  *
- * Autoplay advances one page every AUTOPLAY_MS and loops seamlessly: the track
- * renders the programs twice, and after the last page the carousel slides one
- * extra page into the duplicate copy (visually identical to the first page) and
- * then snaps its position back invisibly. Autoplay pauses while hovered,
- * focused, dragged, while the details modal is open, when the tab is hidden,
- * and for prefers-reduced-motion.
+ * When the programs overflow the viewport, autoplay advances one page every
+ * AUTOPLAY_MS and loops seamlessly: the track then renders the programs twice,
+ * and after the last page the carousel slides one extra page into the duplicate
+ * copy (visually identical to the first page) and snaps its position back
+ * invisibly. When everything fits on one page — one program on mobile, two on
+ * tablets, up to three on desktop — the track renders each program exactly
+ * once with no clones, no controls and no autoplay, so a small dataset can
+ * never appear duplicated. Autoplay pauses while hovered, focused, dragged,
+ * while the details modal is open, when the tab is hidden, and for
+ * prefers-reduced-motion.
  */
 export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
   const trackRef = useRef<HTMLUListElement>(null);
@@ -84,6 +88,7 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
   const [cardWidth, setCardWidth] = useState(0);
   const [gap, setGap] = useState(0);
   const [visibleCount, setVisibleCount] = useState(1);
+  const [measured, setMeasured] = useState(false);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -105,10 +110,15 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
   const canNext = index < maxIndex;
   const activeIndex = index > maxIndex ? 0 : index;
 
-  // The track renders the programs twice; after the last page the carousel
-  // moves one page further into the duplicate copy, which shows the same cards
-  // as the first page, so snapping back to page 0 is visually seamless.
-  const items = count > 0 ? [...programs, ...programs] : [];
+  // The track renders the programs twice ONLY while the dataset overflows the
+  // viewport (maxIndex > 0) AND the viewport has actually been measured: the
+  // second copy exists solely for the seamless wrap-around slide and stays
+  // inert + off-screen. Rendering it earlier (server HTML / first paint, or
+  // when everything already fits — a single program, or two programs on
+  // desktop) would lay the clones inside the visible area as literal duplicate
+  // cards, so only the real programs render — one CMS record, one card, ever.
+  const items =
+    count > 0 && measured && maxIndex > 0 ? [...programs, ...programs] : programs;
 
   // Measure the first card and the visible viewport width, then derive how many
   // cards fit per breakpoint so the slide offset tracks the real rendered width
@@ -118,6 +128,7 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
   // all that's needed.
   useEffect(() => {
     let frame = 0;
+    let attempts = 0;
 
     const measure = () => {
       const track = trackRef.current;
@@ -126,10 +137,17 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
       if (!track || !card || !viewport) return;
       const width = card.getBoundingClientRect().width;
       const viewportWidth = viewport.getBoundingClientRect().width;
-      if (width <= 0 || viewportWidth <= 0) return;
+      // Layout not ready yet (hidden tab, throttled webview, fonts still
+      // loading) — retry for a bounded number of frames instead of giving up,
+      // otherwise the carousel would never engage loop/controls.
+      if (width <= 0 || viewportWidth <= 0) {
+        if (attempts++ < 30) frame = requestAnimationFrame(measure);
+        return;
+      }
       setCardWidth(width);
       setGap(parseFloat(getComputedStyle(track).columnGap || "0") || 0);
       setVisibleCount(Math.max(1, Math.round(viewportWidth / width)));
+      setMeasured(true);
     };
 
     const measureOnFrame = () => {
@@ -186,13 +204,14 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
       modalOpen ||
       dragging ||
       !pageVisible ||
+      !measured ||
       maxIndex <= 0
     ) {
       return;
     }
     const id = window.setInterval(advance, AUTOPLAY_MS);
     return () => window.clearInterval(id);
-  }, [advance, reduceMotion, paused, modalOpen, dragging, pageVisible, index, maxIndex]);
+  }, [advance, reduceMotion, paused, modalOpen, dragging, pageVisible, index, measured, maxIndex]);
 
   // The final slide into the duplicate copy has the same content as page 0, so
   // snap the position back with zero duration the moment that animation ends.
@@ -216,7 +235,7 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
             ref={trackRef}
             aria-label="Upcoming MASOM programs"
             className="flex gap-4"
-            drag={maxIndex > 0 ? "x" : false}
+            drag={measured && maxIndex > 0 ? "x" : false}
             dragConstraints={{ left: maxOffset, right: 0 }}
             dragElastic={0.12}
             onDragStart={() => setDragging(true)}
@@ -255,7 +274,7 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
           </motion.ul>
         </div>
 
-        {maxIndex > 0 ? (
+        {measured && maxIndex > 0 ? (
           <>
             <CarouselButton
               dir="prev"
@@ -272,7 +291,7 @@ export function ProgramCardGrid({ programs }: ProgramCardGridProps) {
       </div>
 
       {/* Pagination dots — only when there is more than one page of cards. */}
-      {maxIndex > 0 ? (
+      {measured && maxIndex > 0 ? (
         <div className="mt-6 flex items-center justify-center gap-1.5">
           {Array.from({ length: maxIndex + 1 }, (_, dotIndex) => (
             <button

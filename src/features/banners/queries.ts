@@ -9,7 +9,7 @@ import {
 } from "@/features/home/data/hero-slides";
 import { logCmsError } from "@/lib/cms/logging";
 import { CMS_BUCKETS, resolveImageSrc } from "@/lib/media/storage";
-import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { createSupabaseFreshPublicClient } from "@/lib/supabase/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import type { BannerAdminItem, BannerRow, HeroBanner } from "./types";
@@ -119,13 +119,18 @@ function fallbackBanners(): HeroBanner[] {
 }
 
 /**
- * Public hero banners. Uses active CMS rows when present; otherwise falls back
- * to the local reference banners so the homepage is never broken/empty before
- * the owner has published any content.
+ * Public hero banners — UNCACHED. Reads bypass Next's Data Cache
+ * (cache: "no-store"), so a banner shown/hidden/edited in the CMS appears on
+ * the very next homepage request with no ISR or revalidation window.
+ *
+ * Uses active CMS rows when present. A SUCCESSFUL EMPTY result (all banners
+ * hidden) is a valid CMS state: the homepage then renders the hero with
+ * default content rather than resurrecting the local reference banners —
+ * fallback is reserved for actual query failures (network/Supabase down).
  */
 export async function getActiveBanners(): Promise<HeroBanner[]> {
   try {
-    const supabase = createSupabasePublicClient();
+    const supabase = createSupabaseFreshPublicClient();
     const { data, error } = await supabase
       .from("banners")
       .select(
@@ -136,17 +141,13 @@ export async function getActiveBanners(): Promise<HeroBanner[]> {
 
     if (error) throw error;
 
-    if (data && data.length > 0) {
-      const banners = data
-        .map(toHeroBanner)
-        .filter((banner): banner is HeroBanner => banner !== null);
-      if (banners.length > 0) return banners;
-    }
+    return (data ?? [])
+      .map(toHeroBanner)
+      .filter((banner): banner is HeroBanner => banner !== null);
   } catch (error) {
     logCmsError("banners:getActive", error);
+    return fallbackBanners();
   }
-
-  return fallbackBanners();
 }
 
 /** Admin: every banner, ordered for the manager table, with preview URLs. */

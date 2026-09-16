@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { logCmsError } from "@/lib/cms/logging";
-import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { createSupabaseFreshPublicClient } from "@/lib/supabase/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import type { AnnouncementAdminItem, AnnouncementRow, AnnouncementView } from "./types";
@@ -27,13 +27,16 @@ function toView(row: AnnouncementRow): AnnouncementView {
 }
 
 /**
- * Public announcements for the ticker. Returns only active, in-window rows.
- * There is intentionally NO local fallback — the ticker is a new feature, so
- * an empty result simply hides it on the homepage.
+ * Public announcements for the ticker — UNCACHED. Reads bypass Next's Data
+ * Cache (cache: "no-store"), so hiding/showing/editing an announcement in the
+ * CMS is reflected on the very next homepage request. Returns only active,
+ * in-window rows. There is intentionally NO local fallback — the ticker is a
+ * new feature, so an empty result simply hides it on the homepage (a
+ * successful empty query is a valid CMS state, not an error).
  */
 export async function getActiveAnnouncements(): Promise<AnnouncementView[]> {
   try {
-    const supabase = createSupabasePublicClient();
+    const supabase = createSupabaseFreshPublicClient();
     const { data, error } = await supabase
       .from("announcements")
       .select("*")

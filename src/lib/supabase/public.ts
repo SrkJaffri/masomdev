@@ -34,12 +34,16 @@ function createCachedPublicFetch(tags?: string[]) {
 
 const defaultFetch = createCachedPublicFetch();
 
+/** Always-network fetch — never served from Next's Data Cache. */
+async function noStoreFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, { ...init, cache: "no-store" });
+}
+
 /**
- * Read-only Supabase client for PUBLIC homepage content (banners, programs,
- * announcements). It uses the anon key and no cookies/session, so public
- * queries do not read `cookies()` and therefore do not opt the homepage into
- * dynamic rendering — the page stays statically renderable (great for SEO) and
- * refreshes through `revalidatePath("/")` / `revalidateTag(...)` after admin
+ * Read-only Supabase client for cached PUBLIC content (programs). It uses the
+ * anon key and no cookies/session, so public queries do not read `cookies()`
+ * and therefore do not opt pages into dynamic rendering. Results refresh
+ * through `revalidateTag("programs")` / `revalidatePath(...)` after admin
  * changes.
  *
  * Only the public RLS policies (the `anon` role) apply here, which is exactly
@@ -53,6 +57,23 @@ export function createSupabasePublicClient() {
   return createClient(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { fetch: defaultFetch },
+  });
+}
+
+/**
+ * Uncached variant for content that MUST reflect admin changes on the very
+ * next request (banners, announcements). Bypasses Next's fetch/Data Cache
+ * entirely (`cache: "no-store"`) so every call goes straight to Postgres —
+ * no ISR window, no stale tag dependency, no out-of-band-edit blind spot.
+ * Still anon/RLS-only and session-free; still safe for statically-friendly
+ * code paths that simply need fresh values.
+ */
+export function createSupabaseFreshPublicClient() {
+  const { url, anonKey } = getSupabasePublicEnv();
+
+  return createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: noStoreFetch },
   });
 }
 
