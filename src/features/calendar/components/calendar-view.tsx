@@ -1,13 +1,14 @@
 import { DownloadIcon, FileTextIcon, MapPinIcon } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
-import { publicTimingOrder } from "@/features/calendar/config";
+import { calendarYear, publicTimingOrder } from "@/features/calendar/config";
 import { NextPrayerCard } from "@/features/prayer-calendar/components/next-prayer-card";
 import { prayerTimeLabels } from "@/features/prayer-calendar/config";
 import type { CalendarMonthView } from "@/features/calendar/types";
 import { cn } from "@/lib/utils";
 
 import { MonthSelector } from "./month-selector";
+import { YearSelector } from "./year-selector";
 
 /** Tailwind classes for an event badge, chosen by its category. */
 function categoryClass(category: string | null): string {
@@ -193,6 +194,12 @@ export function CalendarView({
   const hasData = month.days.some(
     (day) => day.hijri || day.events.length > 0 || day.timings.some((slot) => slot.time),
   );
+  // The official annual PDF is published per shipped year (2026 today); past
+  // pilot years rely on the monthly export instead.
+  const isShippedYear = year === calendarYear;
+  // "Today" highlighting is inherently year-safe: todayISO is a full
+  // YYYY-MM-DD of the real current date, which can never equal a historical
+  // year's day (no same month/day false matches).
 
   return (
     <div className="bg-background pb-16">
@@ -205,15 +212,17 @@ export function CalendarView({
             <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
               Hijri Calendar {year}
             </h1>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-            >
-              <FileTextIcon aria-hidden="true" className="size-4" />
-              View Official {year} Calendar PDF
-            </a>
+            {isShippedYear ? (
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              >
+                <FileTextIcon aria-hidden="true" className="size-4" />
+                View Official {year} Calendar PDF
+              </a>
+            ) : null}
           </div>
           <p className="mt-3 max-w-2xl text-base text-muted-foreground">
             Daily prayer timings, Hijri dates and Islamic events for the MASOM community.
@@ -233,7 +242,8 @@ export function CalendarView({
         {/* Month selector toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
           <div className="flex flex-wrap items-center gap-3">
-            <MonthSelector selectedMonth={month.month} />
+            <MonthSelector selectedMonth={month.month} selectedYear={year} />
+            <YearSelector selectedYear={year} selectedMonth={month.month} />
             <a
               href={`/api/calendar/export?year=${year}&month=${month.month}&v=2`}
               className="inline-flex items-center gap-2 rounded-xl border border-brand-500/40 bg-card px-4 py-2.5 text-sm font-semibold text-brand-700 shadow-card transition-colors hover:border-brand-500 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"

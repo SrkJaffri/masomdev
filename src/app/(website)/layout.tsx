@@ -1,4 +1,5 @@
 import { SiteFooter } from "@/components/layout/site-footer";
+import { WhatsAppFloatingButton } from "@/components/website/whatsapp-floating-button";
 import { SiteHeader } from "@/components/layout/site-header";
 import { CustomCursor } from "@/components/website/custom-cursor";
 
@@ -15,6 +16,7 @@ export default function WebsiteLayout({
       </main>
       <SiteFooter />
       <CustomCursor />
+      <WhatsAppFloatingButton />
     </div>
   );
 }

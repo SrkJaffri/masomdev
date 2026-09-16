@@ -1,5 +1,10 @@
 import { CalendarView } from "@/features/calendar/components/calendar-view";
-import { calendarBasePath, calendarPdfUrl, calendarYear } from "@/features/calendar/config";
+import {
+  calendarBasePath,
+  calendarPdfUrl,
+  calendarYear,
+  isSupportedCalendarYear,
+} from "@/features/calendar/config";
 import { getCalendarMonth } from "@/features/calendar/queries";
 import type { CalendarMonthView } from "@/features/calendar/types";
 import { createMetadata } from "@/lib/seo/metadata";
@@ -41,6 +46,13 @@ function resolveMonthParam(raw: string | string[] | undefined, fallback: number)
   return Number.isInteger(value) && value >= 1 && value <= 12 ? value : fallback;
 }
 
+/** Parses the ?year= URL parameter; anything but a supported calendar year
+ * falls back to the shipped year (2026). */
+function resolveYearParam(raw: string | string[] | undefined, fallback: number): number {
+  const value = typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+  return isSupportedCalendarYear(value) ? value : fallback;
+}
+
 function emptyMonth(year: number, month: number): CalendarMonthView {
   const monthLabel = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
     month: "long",
@@ -53,15 +65,23 @@ function emptyMonth(year: number, month: number): CalendarMonthView {
 export default async function HijriCalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string | string[] }>;
+  searchParams: Promise<{ month?: string | string[]; year?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const selectedMonth = resolveMonthParam(params.month, chicagoCurrentMonth());
-  const monthView = (await getCalendarMonth(calendarYear, selectedMonth)) ?? emptyMonth(calendarYear, selectedMonth);
+  const selectedYear = resolveYearParam(params.year, calendarYear);
+  // When no month is requested, only the shipped year opens on the current
+  // month — historical years open on January (there is no "current" month in
+  // 2025 to land on).
+  const selectedMonth = resolveMonthParam(
+    params.month,
+    selectedYear === calendarYear ? chicagoCurrentMonth() : 1,
+  );
+  const monthView =
+    (await getCalendarMonth(selectedYear, selectedMonth)) ?? emptyMonth(selectedYear, selectedMonth);
 
   return (
     <CalendarView
-      year={calendarYear}
+      year={selectedYear}
       month={monthView}
       todayISO={chicagoTodayISO()}
       pdfUrl={calendarPdfUrl}

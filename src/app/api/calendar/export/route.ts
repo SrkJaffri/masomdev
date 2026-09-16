@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { calendarYear } from "@/features/calendar/config";
+import { calendarYear, isSupportedCalendarYear } from "@/features/calendar/config";
 import { getCalendarMonth } from "@/features/calendar/queries";
 import { logCmsError } from "@/lib/cms/logging";
 import { buildMonthlyCalendarPdf, LOGO_PATH } from "@/lib/pdf/calendar-month-pdf";
@@ -30,6 +30,8 @@ const MONTH_LABELS = [
  * (current Hijri boundaries + overrides included) and streams it as an
  * attachment. Public data — no auth, but every parameter is validated and only
  * the selected month's rows are fetched. Nothing is persisted to storage.
+ * The year must be a supported calendar year (2025 pilot, shipped 2026) — the
+ * official annual PDF download stays year-specific elsewhere.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -39,9 +41,9 @@ export async function GET(request: Request) {
   const year = Number.isInteger(rawYear) ? rawYear : Number.NaN;
   const month = Number.isInteger(rawMonth) ? rawMonth : Number.NaN;
 
-  // Only the published calendar year and 1-12 are valid; everything else is a
+  // Only supported calendar years and 1-12 are valid; everything else is a
   // safe 400 (never an exception leak).
-  if (year !== calendarYear || month < 1 || month > 12) {
+  if (!isSupportedCalendarYear(year) || month < 1 || month > 12) {
     return new NextResponse("Invalid year or month.", { status: 400 });
   }
 

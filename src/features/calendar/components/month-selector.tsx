@@ -23,6 +23,8 @@ const monthLabels = [
 type MonthSelectorProps = {
   /** Currently displayed Gregorian month (1-12). */
   selectedMonth: number;
+  /** Currently displayed Gregorian year, carried through the URL when switching months. */
+  selectedYear?: number;
   className?: string;
 };
 
@@ -31,14 +33,22 @@ type MonthSelectorProps = {
  * navigates to `${calendarBasePath}?month=N` (GET) — no heavy calendar library,
  * works without JavaScript (the hidden submit button), and is fully keyboard
  * operable. On change the form submits itself for a fluid single-click UX.
+ * The displayed year is carried through (hidden input) so month navigation
+ * stays inside the selected year instead of snapping back to the shipped one.
  */
-export function MonthSelector({ selectedMonth, className }: MonthSelectorProps) {
+export function MonthSelector({ selectedMonth, selectedYear, className }: MonthSelectorProps) {
+  const year = selectedYear ?? calendarYear;
+
   return (
     <form
       method="get"
       action={calendarBasePath}
       className={cn("flex items-center gap-3", className)}
     >
+      {/* Keep the selected year in the URL when only the month changes. */}
+      {selectedYear !== undefined ? (
+        <input type="hidden" name="year" value={selectedYear} />
+      ) : null}
       <label htmlFor="calendar-month" className="text-sm font-semibold text-foreground">
         Month
       </label>
@@ -52,7 +62,7 @@ export function MonthSelector({ selectedMonth, className }: MonthSelectorProps) 
         >
           {monthLabels.map((label, index) => (
             <option key={label} value={index + 1}>
-              {label} {calendarYear}
+              {label} {year}
             </option>
           ))}
         </select>

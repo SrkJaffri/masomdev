@@ -51,8 +51,22 @@ export const publicTimingOrder: PrayerTimeKey[] = [
   "midnight",
 ];
 
-/** The calendar year this deployment ships with. */
+/** The calendar year this deployment ships with (the default/public URL year). */
 export const calendarYear = 2026;
+
+/**
+ * Every Gregorian year with a complete, published calendar in the database.
+ * 2025 is the historical pilot (official imported data); 2026 is the shipped
+ * year. The public year dropdown is generated from this list — adding a future
+ * year to the public site is a data task, not a UI change.
+ */
+export const supportedCalendarYears = [2025, 2026] as const;
+
+export type SupportedCalendarYear = (typeof supportedCalendarYears)[number];
+
+export function isSupportedCalendarYear(value: number): value is SupportedCalendarYear {
+  return (supportedCalendarYears as readonly number[]).includes(value);
+}
 
 /** Canonical public route for the calendar (legacy-compatible). */
 export const calendarBasePath = "/hijricalendar2026";
