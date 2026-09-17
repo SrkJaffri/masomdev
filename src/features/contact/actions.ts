@@ -4,11 +4,12 @@ import { createHash } from "node:crypto";
 
 import { headers } from "next/headers";
 
-import { getContactEmailConfig, getTurnstileSecret } from "@/config/env";
+import { getContactEmailConfig } from "@/config/env";
 import { logCmsError } from "@/lib/cms/logging";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+import { createCaptchaChallenge, verifyCaptchaAnswer } from "./captcha";
 import { contactFormSchema } from "./schema";
 import type { ContactActionResult } from "./types";
 
@@ -17,23 +18,23 @@ import type { ContactActionResult } from "./types";
  * contact_submissions from the public site.
  *
  * Check order (rate limit LAST before the real work — a cooldown is consumed
- * only by ACCEPTED submissions, never by validation/Turnstile corrections):
+ * only by ACCEPTED submissions, never by validation/captcha corrections):
  * 1. honeypot (silent success)
- * 2. Zod validation (name/email/message/consent/token)
- * 3. Turnstile server verification
+ * 2. Zod validation (name/email/message/consent)
+ * 3. math CAPTCHA verification (server-owned signed cookie; rotated every attempt)
  * 4. rate-limit CHECK (per-IP, contact-namespaced limiter)
  * 5. rate-limit RESERVE (stamp cooldown for this accepted attempt)
  * 6. DB insert FIRST (the submission must survive email failure)
  * 7. best-effort Resend notification
  *
  * Security model:
- * - Runs server-side only; service-role key + Turnstile secret stay on the
- *   server.
+ * - Runs server-side only; service-role key stays on the server (it also keys
+ *   the CAPTCHA cookie signature and the IP hash).
  * - The table has NO anon RLS policies, so the public API cannot touch it.
  * - Consent is validated SERVER-SIDE (the browser checkbox is not trusted).
  * - Emails are normalized (trim) before persistence.
- * - Spam: honeypot + per-IP throttle + Turnstile. Errors are generic — no
- *   DB/Cloudflare/Resend internals leak.
+ * - Spam: honeypot + per-IP throttle + math CAPTCHA. Errors are generic — no
+ *   DB/Resend internals leak.
  */
 
 // Contact form has its OWN limiter instance — a recent Donate/Newsletter
@@ -59,7 +60,6 @@ export async function submitContactForm(
     email: formData.get("email") ?? "",
     message: formData.get("message") ?? "",
     consent: formData.get("consent"),
-    turnstileToken: formData.get("turnstileToken") ?? "",
     website: formData.get("website") ?? "",
   });
 
@@ -70,19 +70,20 @@ export async function submitContactForm(
     };
   }
 
-  // 3. Turnstile server verification — must pass BEFORE any DB write or
-  //    email, and BEFORE the rate limiter (so solving the challenge after a
-  //    failure is never blocked by a stale cooldown).
-  const ip = await resolveClientIp();
-  const turnstileOk = await verifyTurnstile(parsed.data.turnstileToken, ip);
-  if (!turnstileOk) {
-    return {
-      status: "error",
-      message: "Security verification failed. Please try again.",
-    };
+  // 3. Math CAPTCHA — server-owned answer, verified before anything else
+  //    happens. Rotates the challenge on every attempt.
+  const captchaResult = await verifyCaptchaAnswer(
+    typeof formData.get("captchaAnswer") === "string" ? (formData.get("captchaAnswer") as string) : "",
+  );
+  if (captchaResult === "missing") {
+    return { status: "error", message: "Please answer the security question." };
+  }
+  if (captchaResult === "wrong") {
+    return { status: "error", message: "Security answer is incorrect. Please try again." };
   }
 
   // 4. Rate-limit CHECK — only ACCEPTED submissions are inside a cooldown.
+  const ip = await resolveClientIp();
   const limiterKey = `contact:${ip}`;
   if (contactLimiter.isLimited(limiterKey)) {
     return {
@@ -91,8 +92,7 @@ export async function submitContactForm(
     };
   }
 
-  // 5. RESERVE the cooldown for this accepted attempt (validation and
-  //    Turnstile already passed — a genuine submission is being processed).
+  // 5. RESERVE the cooldown for this accepted attempt.
   contactLimiter.reserve(limiterKey);
 
   const { name, email, message } = parsed.data;
@@ -158,6 +158,18 @@ export async function submitContactForm(
   }
 }
 
+/**
+ * Create a fresh CAPTCHA challenge: generates the operands, writes the signed
+ * HttpOnly cookie, and returns the question for display. Called by the form
+ * on mount and by the "New question" refresh — generate and apply happen in
+ * ONE action so the displayed question always matches the stored answer
+ * (page renders cannot write cookies in Next.js).
+ */
+export async function refreshCaptchaChallenge(): Promise<string> {
+  const { question } = await createCaptchaChallenge();
+  return question;
+}
+
 // ---------------------------------------------------------------------------
 // Client IP resolution — trusted-header strategy (first value wins).
 // ---------------------------------------------------------------------------
@@ -184,45 +196,6 @@ async function resolveClientIp(): Promise<string> {
   if (process.env.NODE_ENV === "development") return "local-dev";
 
   return "unknown";
-}
-
-// ---------------------------------------------------------------------------
-// Turnstile verification (server-side only)
-// ---------------------------------------------------------------------------
-const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-
-async function verifyTurnstile(token: string, remoteIp: string | null): Promise<boolean> {
-  const secret = getTurnstileSecret();
-
-  // No secret configured = verification cannot run. Fail closed for the
-  // public form rather than accepting unverified traffic silently.
-  if (!secret) {
-    console.error("contact:submit — TURNSTILE_SECRET_KEY is not set; rejecting submission.");
-    return false;
-  }
-
-  try {
-    const body = new URLSearchParams({ secret, response: token });
-    if (remoteIp && remoteIp !== "unknown") body.set("remoteip", remoteIp);
-
-    const response = await fetch(TURNSTILE_VERIFY_URL, {
-      method: "POST",
-      body,
-      // Verification responses are short-lived; never cache.
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      console.error(`contact:turnstile — verify endpoint returned HTTP ${response.status}`);
-      return false;
-    }
-
-    const result = (await response.json()) as { success: boolean };
-    return result.success === true;
-  } catch (error) {
-    logCmsError("contact:turnstile", error);
-    return false;
-  }
 }
 
 /** One-way hash of the client IP — abuse correlation without storing the raw

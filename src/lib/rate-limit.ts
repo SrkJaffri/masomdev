@@ -5,7 +5,7 @@
  * - `check(key, now)`   → reads without writing. Blocks only while a
  *   previously ACCEPTED submission is inside its cooldown window.
  * - `reserve(key, now)` → stamps the cooldown. Called ONLY after a submission
- *   has passed validation + Turnstile and is genuinely being processed.
+ *   has passed validation + CAPTCHA and is genuinely being processed.
  *
  * Each feature creates its OWN limiter instance (`contact:`, `donation:`,
  * `newsletter:` namespaces), so a recent action in one module can never block

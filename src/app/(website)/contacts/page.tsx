@@ -17,6 +17,9 @@ export const metadata = createMetadata({
 const { contact } = siteConfig;
 
 export default function ContactsPage() {
+  // The math challenge is created by the form's mount Server Action (generate
+  // + apply cookie in ONE step, so the displayed question always matches the
+  // signed cookie — page renders cannot write cookies in Next.js).
   return (
     <>
       {/* Page hero */}

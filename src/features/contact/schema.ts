@@ -3,8 +3,8 @@ import { z } from "zod";
 /**
  * Public contact form (/contacts). The honeypot (`website`) mirrors the
  * donation form's pattern — bots that fill it are silently dropped. Consent
- * and the Turnstile token are validated server-side; the browser is never
- * trusted.
+ * and the math-CAPTCHA answer are validated server-side; the browser is
+ * never trusted.
  */
 export const contactFormSchema = z.object({
   name: z
@@ -28,10 +28,6 @@ export const contactFormSchema = z.object({
     .nullish()
     .transform((value) => value === true || value === "true" || value === "on")
     .refine((value) => value, { message: "Please agree before submitting." }),
-  /** Cloudflare Turnstile token from the widget. */
-  turnstileToken: z
-    .string()
-    .min(1, "Please complete the security verification."),
   /** Honeypot field — must stay empty. */
   website: z.string().max(0, "Invalid submission."),
 });

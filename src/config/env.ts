@@ -75,28 +75,15 @@ export function getContactEmailConfig(): ContactEmailConfig | null {
 
   const apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
   const from = process.env.RESEND_FROM_EMAIL?.trim() ?? "";
-  // Hierarchy: dedicated contact recipient, else the donation notification
-  // recipient (same office), else the secretary address from site config.
+  // Recipient for contact-form notifications. Falls back to the secretary
+  // inbox (the address published on the MASOM contact page).
   const to =
     process.env.CONTACT_NOTIFICATION_EMAIL?.trim() ||
-    process.env.DONATION_NOTIFICATION_EMAIL?.trim() ||
     "secretary@masom.com";
 
   if (!apiKey || !from) return null;
 
   return { apiKey, from, to };
-}
-
-/**
- * Server-only Cloudflare Turnstile secret. Returns null when unset so callers
- * can decide whether verification is enforceable. Never exposed to the
- * browser — only NEXT_PUBLIC_TURNSTILE_SITE_KEY is public.
- */
-export function getTurnstileSecret(): string | null {
-  if (typeof window !== "undefined") return null;
-
-  const secret = process.env.TURNSTILE_SECRET_KEY?.trim() ?? "";
-  return secret || null;
 }
 
 /**
