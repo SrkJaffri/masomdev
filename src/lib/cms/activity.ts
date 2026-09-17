@@ -5,7 +5,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logCmsError } from "./logging";
 
 /** Modules that are tracked in the admin activity log. */
-export type ActivityModule = "banner" | "program" | "announcement" | "calendar";
+export type ActivityModule =
+  | "banner"
+  | "program"
+  | "announcement"
+  | "calendar"
+  | "newsletter";
 
 export type ActivityRecord = {
   id: string;

@@ -7,6 +7,7 @@ import {
   LayoutDashboardIcon,
   Loader2Icon,
   LogOutIcon,
+  MailIcon,
   MegaphoneIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -66,6 +67,7 @@ function buildSections(): NavSection[] {
         { href: "/admin/programs", label: "Programs", icon: CalendarDaysIcon, accent: "blue", countKey: "programs" },
         { href: "/admin/announcements", label: "Announcements", icon: MegaphoneIcon, accent: "violet", countKey: "announcements" },
         { href: "/admin/calendar", label: "Calendar", icon: CalendarIcon, accent: "amber", countKey: "calendar" },
+        { href: "/admin/newsletter", label: "Newsletter", icon: MailIcon, accent: "teal", countKey: "newsletter" },
       ],
     },
   ];

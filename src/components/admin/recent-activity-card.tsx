@@ -3,6 +3,7 @@ import {
   CalendarDaysIcon,
   CalendarIcon,
   ImageIcon,
+  MailIcon,
   MegaphoneIcon,
   PencilIcon,
   PlusIcon,
@@ -30,6 +31,7 @@ const MODULE_META: Record<
   program: { label: "Program", icon: CalendarDaysIcon },
   announcement: { label: "Announcement", icon: MegaphoneIcon },
   calendar: { label: "Calendar", icon: CalendarIcon },
+  newsletter: { label: "Newsletter", icon: MailIcon },
 };
 
 function actionMeta(action: string): {

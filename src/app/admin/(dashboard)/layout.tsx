@@ -4,6 +4,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { getAnnouncementCounts } from "@/features/announcements/queries";
 import { getBannerCounts } from "@/features/banners/queries";
 import { getCalendarEventCounts } from "@/features/calendar/queries";
+import { getNewsletterCounts } from "@/features/newsletter/queries";
 import { getProgramCounts } from "@/features/programs/queries";
 import { requireAdmin } from "@/features/auth/guard";
 
@@ -16,11 +17,12 @@ export default async function AdminDashboardLayout({
 
   // The four lean count queries are React-cached, so the sidebar badges and the
   // dashboard stat cards share ONE fetch per request — no duplicate counts.
-  const [banners, programs, announcements, calendarEvents] = await Promise.all([
+  const [banners, programs, announcements, calendarEvents, newsletter] = await Promise.all([
     getBannerCounts(),
     getProgramCounts(),
     getAnnouncementCounts(),
     getCalendarEventCounts(),
+    getNewsletterCounts(),
   ]);
 
   const metadataName =
@@ -37,6 +39,7 @@ export default async function AdminDashboardLayout({
         programs: programs.total,
         announcements: announcements.total,
         calendar: calendarEvents.total,
+        newsletter: newsletter.subscribed,
       }}
     >
       {children}
