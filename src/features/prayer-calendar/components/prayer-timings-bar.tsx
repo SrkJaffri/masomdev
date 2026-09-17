@@ -27,6 +27,11 @@ export function PrayerTimingsBar({
   const { gregorianDate, hijriDate, slots } = timings;
   const hasDate = Boolean(gregorianDate ?? hijriDate);
 
+  // Header-only display choice: Sunset is still published in the calendar,
+  // admin, PDFs and data layer — it is just not shown in this header strip.
+  // (Client request: Fajr, Sunrise, Zohar, Maghrib, Midnight.)
+  const displaySlots = slots.filter((slot) => slot.key !== "sunset");
+
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
@@ -43,8 +48,8 @@ export function PrayerTimingsBar({
         ) : null}
       </div>
 
-      <ul className="mt-3 grid grid-cols-3 gap-y-4 sm:grid-cols-6 sm:gap-y-0">
-        {slots.map((slot, index) => (
+      <ul className="mt-3 grid grid-cols-3 gap-y-4 sm:grid-cols-5 sm:gap-y-0">
+        {displaySlots.map((slot, index) => (
           <li
             key={slot.key}
             className={cn(
