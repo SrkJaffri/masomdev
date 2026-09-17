@@ -11,7 +11,8 @@ export type ActivityModule =
   | "announcement"
   | "calendar"
   | "newsletter"
-  | "contact";
+  | "contact"
+  | "settings";
 
 export type ActivityRecord = {
   id: string;

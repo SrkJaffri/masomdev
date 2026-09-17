@@ -8,6 +8,7 @@ import {
   MessageSquareIcon,
   PencilIcon,
   PlusIcon,
+  SettingsIcon,
   Trash2Icon,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
@@ -34,6 +35,7 @@ const MODULE_META: Record<
   calendar: { label: "Calendar", icon: CalendarIcon },
   newsletter: { label: "Newsletter", icon: MailIcon },
   contact: { label: "Contact message", icon: MessageSquareIcon },
+  settings: { label: "Site settings", icon: SettingsIcon },
 };
 
 function actionMeta(action: string): {

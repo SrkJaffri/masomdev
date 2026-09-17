@@ -12,6 +12,7 @@ import {
   MessageSquareIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
+  SettingsIcon,
   XIcon,
 } from "lucide-react";
 import Link, { useLinkStatus } from "next/link";
@@ -70,6 +71,12 @@ function buildSections(): NavSection[] {
         { href: "/admin/calendar", label: "Calendar", icon: CalendarIcon, accent: "amber", countKey: "calendar" },
         { href: "/admin/newsletter", label: "Newsletter", icon: MailIcon, accent: "teal", countKey: "newsletter" },
         { href: "/admin/contact-messages", label: "Contact Messages", icon: MessageSquareIcon, accent: "blue", countKey: "contact" },
+      ],
+    },
+    {
+      label: "Settings",
+      items: [
+        { href: "/admin/site-settings", label: "Site Settings", icon: SettingsIcon, accent: "violet" },
       ],
     },
   ];
