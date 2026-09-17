@@ -141,11 +141,35 @@ export function TurnstileWidget({
     return () => handleRef(null);
   }, [handleRef]);
 
-  if (!siteKey || state === "error") {
-    // Config problem: render nothing instead of blocking the form visually.
-    // The server still enforces verification (fail-closed), so the form will
-    // explain via its error message if the token is missing.
-    return null;
+  if (!siteKey) {
+    // Configuration problem (no site key): the server fail-closes anyway, but
+    // the visitor deserves an explanation instead of a silently missing box.
+    return (
+      <p
+        role="status"
+        aria-live="polite"
+        className="rounded-xl border border-border/60 bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground"
+      >
+        Security verification is temporarily unavailable, so the form cannot be
+        submitted right now. Please try again shortly.
+      </p>
+    );
+  }
+
+  if (state === "error") {
+    // The widget failed to initialize (e.g. blocked script, unauthorized
+    // domain in this browser). Explain rather than leaving a mysterious gap —
+    // the server still rejects submissions without a valid token.
+    return (
+      <p
+        role="status"
+        aria-live="polite"
+        className="rounded-xl border border-border/60 bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground"
+      >
+        Security verification could not load in this browser, so the form cannot
+        be submitted right now. Please refresh the page or try again shortly.
+      </p>
+    );
   }
 
   return (
