@@ -80,11 +80,23 @@ export type HijriOverrideFormValues = z.infer<typeof hijriOverrideFormSchema>;
 
 // ---------------------------------------------------------------------------
 // calendar_events — an Islamic event anchored to an authoritative Hijri date.
-// The Gregorian date is derived live from the current hijri_months boundaries,
-// so it is NOT part of the form (it is computed server-side).
+// An EMPTY Hijri year means the event RECURS every Hijri year (canonical
+// recurring model, hijri_year stored as NULL); a filled year pins it to that
+// one Hijri year. The Gregorian date is derived live from the current
+// hijri_months boundaries, so it is NOT part of the form (computed server-side).
 // ---------------------------------------------------------------------------
+const hijriYearOrRecurring = z.preprocess(
+  (value) => (value === null || value === "" || value === undefined ? null : value),
+  z
+    .coerce
+    .number({ message: "Enter a Hijri year or leave blank for every year." })
+    .int()
+    .min(1)
+    .nullable(),
+);
+
 export const calendarEventFormSchema = z.object({
-  hijri_year: hijriYear,
+  hijri_year: hijriYearOrRecurring,
   hijri_month: hijriMonth,
   hijri_day: hijriDay,
   title: requiredText(200),

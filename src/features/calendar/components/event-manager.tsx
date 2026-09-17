@@ -71,8 +71,11 @@ function formatDate(iso: string): string {
 }
 
 function formatHijri(event: CalendarEventAdminItem): string {
-  if (!event.hijri_year || !event.hijri_month || !event.hijri_day) return "—";
-  return `${event.hijri_day} ${hijriMonthName(event.hijri_month)} ${event.hijri_year} AH`;
+  if (!event.hijri_month || !event.hijri_day) return "—";
+  // A recurring event has no Hijri year: it repeats every Hijri year.
+  return event.hijri_year
+    ? `${event.hijri_day} ${hijriMonthName(event.hijri_month)} ${event.hijri_year} AH`
+    : `${event.hijri_day} ${hijriMonthName(event.hijri_month)} (every year)`;
 }
 
 function EventForm({
@@ -98,14 +101,14 @@ function EventForm({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="hijri_year">Hijri year</Label>
+              <Label htmlFor="hijri_year">Hijri year (blank = every year)</Label>
               <Input
                 id="hijri_year"
                 name="hijri_year"
                 type="number"
                 min={1}
-                defaultValue={event?.hijri_year ?? 1448}
-                required
+                defaultValue={event?.hijri_year ?? ""}
+                placeholder="Every year"
               />
             </div>
             <div className="space-y-2">

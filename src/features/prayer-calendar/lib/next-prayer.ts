@@ -2,7 +2,7 @@ import "server-only";
 
 import type { CalendarDayRow } from "@/features/calendar/types";
 import { logCmsError } from "@/lib/cms/logging";
-import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { createSupabaseCalendarClient } from "@/lib/supabase/public";
 import type { NextPrayerCandidate, PrayerTimeKey } from "@/features/prayer-calendar/types";
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ function chicagoEpochFor(dateISO: string, rawTime: string): number | null {
  */
 export async function getNextPrayerCandidates(): Promise<NextPrayerCandidate[]> {
   try {
-    const supabase = createSupabasePublicClient();
+    const supabase = createSupabaseCalendarClient();
     const today = chicagoDateISO(0);
     const tomorrow = chicagoDateISO(1);
 

@@ -22,9 +22,13 @@ export type HijriResolver = (gregorianISO: string) => HijriDate | null;
  * Inverse of {@link HijriResolver}: maps an authoritative Hijri identity
  * (year/month/day) back to the Gregorian "YYYY-MM-DD" it currently resolves to.
  * The mapping is pure boundary arithmetic plus overrides — no baked-in shifts.
+ *
+ * A recurring event passes `year: null` — it resolves through the latest
+ * published boundary's Hijri year (the current occurrence), so it renders in
+ * EVERY Gregorian year the boundaries cover (2025's 1446 days included).
  */
 export type HijriToGregorian = (hijri: {
-  year: number;
+  year: number | null;
   month: number;
   day: number;
 }) => string | null;
@@ -101,7 +105,8 @@ export function createHijriResolver(
  *   1. If an override row exists for that exact Hijri day, its gregorian_date
  *      wins (mirrors the forward resolver's override rule).
  *   2. Otherwise the date is `hijri_months.gregorian_start + (hijri_day - 1)`
- *      for the matching (hijri_year, hijri_month) row.
+ *      for the matching (hijri_year, hijri_month) row. A NULL year (recurring
+ *      event) uses the latest published boundary's Hijri year.
  *   3. If no boundary row exists for that month (e.g. a yet-unpublished month),
  *      the previous published boundary is used to count forward, so events never
  *      disappear just because a month is temporarily unpublished.
@@ -114,12 +119,19 @@ export function createHijriToGregorian(
   overrides: Override[] = [],
 ): HijriToGregorian {
   const byMonth = new Map<string, { year: number; month: number; start: number }>();
+  let latestStart = -Infinity;
+  let latestYear: number | null = null;
   for (const m of months) {
     byMonth.set(`${m.hijri_year}-${m.hijri_month}`, {
       year: m.hijri_year,
       month: m.hijri_month,
       start: toDayNumber(m.gregorian_start),
     });
+    const start = toDayNumber(m.gregorian_start);
+    if (start > latestStart) {
+      latestStart = start;
+      latestYear = m.hijri_year;
+    }
   }
 
   const overrideMap = new Map(
@@ -133,17 +145,22 @@ export function createHijriToGregorian(
   );
 
   return ({ year, month, day }) => {
-    const overrideDate = overrideMap.get(`${year}-${month}-${day}`);
+    // A recurring event (year NULL) resolves in the latest published Hijri
+    // year — the current occurrence of the annual cycle.
+    const resolvedYear = year ?? latestYear;
+    if (resolvedYear === null) return null;
+
+    const overrideDate = overrideMap.get(`${resolvedYear}-${month}-${day}`);
     if (overrideDate) return overrideDate;
 
-    let boundary = byMonth.get(`${year}-${month}`);
+    let boundary = byMonth.get(`${resolvedYear}-${month}`);
     let elapsedDays = 0;
     if (!boundary) {
       // Fall back to the most recent published boundary strictly before the
       // requested month, then count forward through alternating month lengths
       // (odd months = 30 days, even months = 29). This keeps events anchored
       // even while a month boundary is temporarily unpublished.
-      const target = year * 12 + (month - 1);
+      const target = resolvedYear * 12 + (month - 1);
       let candidate: { year: number; month: number; start: number } | null = null;
       let candidateIndex = -1;
       for (const b of byMonth.values()) {

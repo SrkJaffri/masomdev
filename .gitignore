@@ -52,3 +52,7 @@ supabase/**/.temp/
 masom.zip
 masom.rar
 masomnew.rar
+01masom.zip
+
+# local database backups
+supabase/backups/

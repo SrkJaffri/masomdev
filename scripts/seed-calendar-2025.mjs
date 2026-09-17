@@ -12,20 +12,34 @@
  *     and stays NULL (it is never shown publicly anyway).
  *   • hijri_months  — the Islamic month-start boundaries for every Hijri month
  *     whose days fall inside 2025, derived from the official per-day Hijri
- *     labels ("1 Rajab 1446" on 2025-01-02 ⇒ boundary 1446/7 = 2025-01-02),
- *     plus the single boundary active on Jan 1 2025 (back-computed from that
- *     day's official label) so early-January days resolve.
+ *     labels ("1 Rajab 1446" on 2025-01-02 ⇒ boundary 1446/7 = 2025-01-02).
+ *     Starts are implied from ALL of a month's labels (not just "1 <Month>"
+ *     days — the printed 2025 table never shows "1 Shawwal"), and days whose
+ *     printed label contradicts the derived boundary are preserved EXACTLY
+ *     as printed via hijri_overrides (exception below).
+ *   • hijri_overrides — only where the printed label contradicts the derived
+ *     boundary (see above); insert-missing, never overwritten. The printed
+ *     "30 Ramzan" label on 2025-04-01 is NOT preserved: the admin-approved
+ *     state (migration 20260917120000) follows the Shawwal 1446 boundary, so
+ *     2025-04-01 renders as 1 Shawwal 1446 (Eid-ul-Fitr 2025). Re-seeding
+ *     therefore never resurrects that label.
+ *   • calendar_events — NOT imported at all. The legacy printed 2025
+ *     timetable is NOT an authority for Islamic event content (its labels
+ *     drifted ±1-2 days and omitted recurring events). The CANONICAL event
+ *     set is the approved 2026 calendar, now stored as RECURRING rows
+ *     (hijri_year IS NULL: month+day = same event every Hijri year) via
+ *     migration 20260917140000 — every year renders them automatically.
+ *     Year-specific events are added through /admin/calendar only.
  *
  * WHAT IT DOES NOT DO (hard guarantees)
  *   • NEVER deletes anything. NEVER truncates.
  *   • NEVER updates an existing hijri_months row — if a boundary already
  *     exists it is only VERIFIED (mismatches are reported, not overwritten),
  *     so the admin's corrected 2026 moon-sighting boundaries are untouchable.
- *   • Only writes calendar_days rows whose date starts "2025-" (asserted).
- *   • Does NOT import events: the source's daily events are the same annual
- *     Islamic events already stored as HIJRI-ANCHORED rows in calendar_events,
- *     which automatically resolve to their 2025 dates via the month
- *     boundaries. One-off 2026 local events are never copied.
+ *   • Only writes rows dated 2025- (asserted) or anchored to the Hijri months
+ *     that overlap 2025; 2026 data is structurally unreachable.
+ *   • Events dedupe on (hijri_year, hijri_month, hijri_day, title) — re-running
+ *     inserts nothing new.
  *
  * RUN (idempotent — safe to re-run, reports inserted/updated/skipped):
  *   node --env-file=.env.local scripts/seed-calendar-2025.mjs
@@ -103,8 +117,18 @@ function toStoredTime(raw) {
 }
 
 const GREGORIAN_MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 /** Parses "January 1, 2025  29 Jamadi-us-Saani 1446" into its parts. */
@@ -120,18 +144,6 @@ function parseDateCell(text) {
     hijri_month_label: match[5],
     hijri_year: Number(match[6]),
   };
-}
-
-/** Maps an official event title prefix to the CMS event category set. */
-function categoryFromTitle(title) {
-  const t = title.toLowerCase();
-  if (t.startsWith("wiladat")) return "Wiladat";
-  if (t.startsWith("wafat")) return "Wafat";
-  if (t.startsWith("martyrdom") || t.startsWith("shahadat")) return "Martyrdom";
-  if (t.startsWith("shab")) return "Shab";
-  if (t.startsWith("eid")) return "Eid";
-  if (t.startsWith("ziarat")) return "Ziarat";
-  return "Historical";
 }
 
 /** Fetches one month of the official 2025 timetable and returns day rows. */
@@ -207,7 +219,9 @@ async function main() {
   // Scope guard: only 2025 rows may ever reach calendar_days.
   const offYear = allDays.filter((d) => !d.gregorian_date.startsWith(`${YEAR}-`));
   if (offYear.length > 0) {
-    throw new Error(`refusing to import non-${YEAR} day rows: ${offYear.map((d) => d.gregorian_date).join(", ")}`);
+    throw new Error(
+      `refusing to import non-${YEAR} day rows: ${offYear.map((d) => d.gregorian_date).join(", ")}`,
+    );
   }
   if (allDays.length !== 365) {
     throw new Error(`expected 365 day rows for 2025, parsed ${allDays.length}`);
@@ -225,7 +239,9 @@ async function main() {
   for (const day of allDays) {
     const monthNum = hijriMonthNumber(day.hijri.hijri_month_label);
     if (monthNum === null) {
-      throw new Error(`unknown Hijri month label "${day.hijri.hijri_month_label}" on ${day.gregorian_date}`);
+      throw new Error(
+        `unknown Hijri month label "${day.hijri.hijri_month_label}" on ${day.gregorian_date}`,
+      );
     }
     day.hijri_month_num = monthNum;
     const key = `${day.hijri.hijri_year}-${monthNum}`;
@@ -239,7 +255,9 @@ async function main() {
   const boundaryConflicts = [];
   for (const [key, starts] of impliedStarts) {
     if (starts.size > 1) {
-      boundaryConflicts.push(`${key}: ${[...starts.entries()].map(([s, c]) => `${s}(${c} days)`).join(", ")}`);
+      boundaryConflicts.push(
+        `${key}: ${[...starts.entries()].map(([s, c]) => `${s}(${c} days)`).join(", ")}`,
+      );
     }
     // Pick the start implied by the most day labels (unique in practice).
     const sortedStarts = [...starts.entries()].sort((a, b) => b[1] - a[1]);
@@ -248,16 +266,25 @@ async function main() {
     boundaries.set(key, { hijri_year, hijri_month, gregorian_start: best });
   }
   for (const conflict of boundaryConflicts) {
-    console.warn(`  BOUNDARY LABEL CONFLICT in source (most-agreed start used): ${conflict}`);
+    console.warn(
+      `  BOUNDARY LABEL CONFLICT in source (most-agreed start used): ${conflict}`,
+    );
   }
   console.log(
     "derived boundaries:",
-    [...boundaries.values()].map((b) => `${b.hijri_year}/${b.hijri_month} → ${b.gregorian_start}`).join(", "),
+    [...boundaries.values()]
+      .map((b) => `${b.hijri_year}/${b.hijri_month} → ${b.gregorian_start}`)
+      .join(", "),
   );
 
   // Days whose official printed label disagrees with the derived boundaries
   // (the Apr 1 2025 "30 Ramzan / 2 Shawwal next day" overlap) are preserved
   // EXACTLY as printed via hijri_overrides — visible data, never silent edits.
+  // EXCEPTION — 2025-04-01: the admin-approved state (migration
+  // 20260917120000) follows the Shawwal 1446 boundary instead of the printed
+  // label, so the day renders as 1 Shawwal 1446 with Eid-ul-Fitr 2025. The
+  // printed "30 Ramzan" label is never re-imported here.
+  const PRESERVE_PRINTED_LABEL_EXCEPT = new Set(["2025-04-01"]);
   const boundaryList = [...boundaries.values()].map((b) => ({
     ...b,
     start: Math.floor(Date.parse(`${b.gregorian_start}T00:00:00Z`) / 86_400_000),
@@ -271,7 +298,10 @@ async function main() {
     }
     if (!match) throw new Error(`no Hijri boundary covers ${day.gregorian_date}`);
     const derivedDay = dayNum - match.start + 1;
-    if (derivedDay !== day.hijri.hijri_day || match.hijri_month !== day.hijri_month_num) {
+    if (
+      (derivedDay !== day.hijri.hijri_day || match.hijri_month !== day.hijri_month_num) &&
+      !PRESERVE_PRINTED_LABEL_EXCEPT.has(day.gregorian_date)
+    ) {
       overrides.push({
         gregorian_date: day.gregorian_date,
         hijri_year: day.hijri.hijri_year,
@@ -330,7 +360,10 @@ async function main() {
     .from("hijri_months")
     .select("hijri_year, hijri_month, gregorian_start");
   const existingByMonth = new Map(
-    (existingMonths ?? []).map((m) => [`${m.hijri_year}-${m.hijri_month}`, m.gregorian_start]),
+    (existingMonths ?? []).map((m) => [
+      `${m.hijri_year}-${m.hijri_month}`,
+      m.gregorian_start,
+    ]),
   );
 
   let insertedBoundaries = 0;
@@ -352,9 +385,10 @@ async function main() {
   }
 
   if (missing.length > 0) {
-    const { error, count } = await supabase
-      .from("hijri_months")
-      .insert(missing.map((b) => ({ ...b, is_published: true })), { count: "exact" });
+    const { error, count } = await supabase.from("hijri_months").insert(
+      missing.map((b) => ({ ...b, is_published: true })),
+      { count: "exact" },
+    );
     if (error) throw error;
     insertedBoundaries = count ?? missing.length;
   }
@@ -371,75 +405,57 @@ async function main() {
   // ---------------------------------------------------------------------------
   let insertedOverrides = 0;
   if (overrides.length > 0) {
-    const offYearOverrides = overrides.filter((o) => !o.gregorian_date.startsWith(`${YEAR}-`));
-    if (offYearOverrides.length > 0) throw new Error("refusing to import non-2025 overrides");
-    const { data: existingOverrides } = await supabase
-      .from("hijri_overrides")
-      .select("gregorian_date")
-      .in("gregorian_date", overrides.map((o) => o.gregorian_date));
+    const offYearOverrides = overrides.filter(
+      (o) => !o.gregorian_date.startsWith(`${YEAR}-`),
+    );
+    if (offYearOverrides.length > 0)
+      throw new Error("refusing to import non-2025 overrides");
+    // Guard the .in() against an empty list (PostgREST would treat it as no
+    // filter and match every row).
+    const overrideDates = overrides.map((o) => o.gregorian_date);
+    const { data: existingOverrides } =
+      overrideDates.length > 0
+        ? await supabase
+            .from("hijri_overrides")
+            .select("gregorian_date")
+            .in("gregorian_date", overrideDates)
+        : { data: [] };
     const haveOverrides = new Set((existingOverrides ?? []).map((o) => o.gregorian_date));
-    const missingOverrides = overrides.filter((o) => !haveOverrides.has(o.gregorian_date));
+    const missingOverrides = overrides.filter(
+      (o) => !haveOverrides.has(o.gregorian_date),
+    );
     if (missingOverrides.length > 0) {
-      const { error, count } = await supabase
-        .from("hijri_overrides")
-        .insert(missingOverrides.map((o) => ({ ...o, is_published: true })), { count: "exact" });
+      const { error, count } = await supabase.from("hijri_overrides").insert(
+        missingOverrides.map((o) => ({ ...o, is_published: true })),
+        { count: "exact" },
+      );
       if (error) throw error;
       insertedOverrides = count ?? missingOverrides.length;
     }
   }
-  console.log(`hijri_overrides: ${insertedOverrides} inserted (of ${overrides.length} needed).`);
+  console.log(
+    `hijri_overrides: ${insertedOverrides} inserted (of ${overrides.length} needed).`,
+  );
 
   // ---------------------------------------------------------------------------
-  // 4c. Import the official 2025 daily events as HIJRI-ANCHORED rows.
-  //    Each source event is anchored to its printed Hijri date, so it joins
-  //    the same recurring-event architecture as 2026 — no Gregorian copies.
-  //    Anchors that already exist (e.g. Rajab 1447 events shared with the 2026
-  //    seed) are skipped; existing rows are never modified or deleted.
+  // 4c. calendar_events are intentionally NOT imported. The canonical Islamic
+  //     event set lives in the recurring (hijri_year IS NULL) rows established
+  //     by migration 20260917140000 and renders for 2025 automatically through
+  //     the Hijri boundaries. Legacy printed-event labels must never return.
   // ---------------------------------------------------------------------------
-  const sourceEvents = [];
-  for (const day of allDays) {
-    for (const title of day.events) {
-      sourceEvents.push({
-        title,
-        category: categoryFromTitle(title),
-        hijri_year: day.hijri.hijri_year,
-        hijri_month: day.hijri_month_num,
-        hijri_day: day.hijri.hijri_day,
-        event_date: day.gregorian_date,
-      });
-    }
-  }
-  const { data: existingAnchors } = await supabase
+  const { count: recurringEvents } = await supabase
     .from("calendar_events")
-    .select("hijri_year, hijri_month, hijri_day, title")
-    .not("hijri_year", "is", null);
-  const anchorKey = (e) => `${e.hijri_year}-${e.hijri_month}-${e.hijri_day}-${e.title.toLowerCase()}`;
-  const existingAnchorSet = new Set((existingAnchors ?? []).map(anchorKey));
-  const newEvents = sourceEvents.filter((e) => !existingAnchorSet.has(anchorKey(e)));
-  let insertedEvents = 0;
-  if (newEvents.length > 0) {
-    const { error, count } = await supabase
-      .from("calendar_events")
-      .insert(
-        newEvents.map((e, index) => ({
-          title: e.title,
-          category: e.category,
-          description: null,
-          hijri_year: e.hijri_year,
-          hijri_month: e.hijri_month,
-          hijri_day: e.hijri_day,
-          event_date: e.event_date,
-          sort_order: index % 10,
-          is_active: true,
-        })),
-        { count: "exact" },
-      );
-    if (error) throw error;
-    insertedEvents = count ?? newEvents.length;
+    .select("*", { count: "exact", head: true })
+    .is("hijri_year", null);
+  const { count: events1446 } = await supabase
+    .from("calendar_events")
+    .select("*", { count: "exact", head: true })
+    .eq("hijri_year", 1446);
+  if (events1446 > 0) {
+    console.warn(
+      `  WARNING: ${events1446} year-specific 1446 rows exist. The canonical model keeps Islamic events recurring (hijri_year IS NULL); review /admin/calendar.`,
+    );
   }
-  console.log(
-    `calendar_events: ${insertedEvents} inserted (${sourceEvents.length} in source, ${sourceEvents.length - newEvents.length} already anchored).`,
-  );
 
   // ---------------------------------------------------------------------------
   // 5. Post-import verification: counts + a spot-check of official labels.
@@ -465,21 +481,28 @@ async function main() {
     .select("fajr, sunrise, midnight")
     .eq("gregorian_date", "2025-06-01")
     .maybeSingle();
-  const { count: events1446 } = await supabase
+  const { count: events1446Verify } = await supabase
     .from("calendar_events")
     .select("*", { count: "exact", head: true })
     .eq("hijri_year", 1446);
-  const { data: aprOverride } = await supabase
-    .from("hijri_overrides")
-    .select("gregorian_date, hijri_month, hijri_day")
-    .eq("gregorian_date", "2025-04-01")
+  const { data: aprShawwal } = await supabase
+    .from("hijri_months")
+    .select("hijri_year, hijri_month, gregorian_start")
+    .eq("hijri_year", 1446)
+    .eq("hijri_month", 10)
     .maybeSingle();
 
   console.log("--- verify ---");
   console.log(`calendar_days 2025: ${days2025} (expect 365)`);
   console.log(`calendar_days 2026: ${days2026} (expect the pre-import count, 365)`);
-  console.log(`calendar_events anchored to 1446: ${events1446}`);
-  console.log("override 2025-04-01 (expect 9/30 = 30 Ramzan, per printed table):", aprOverride);
+  console.log(
+    `calendar_events recurring (hijri_year NULL): ${recurringEvents} (canonical set)`,
+  );
+  console.log(`calendar_events year-specific 1446: ${events1446Verify} (expect 0)`);
+  console.log(
+    "Shawwal 1446 boundary (expect 2025-04-01; Apr 1 renders 1 Shawwal per migration 20260917120000):",
+    aprShawwal,
+  );
   console.log(`spot 2025-01-01 (expect 5:55a / 7:18a / 11:09p):`, spotJan1);
   console.log(`spot 2025-06-01 (expect 3:39a / 5:19a / 11:54p):`, spotJun1);
   console.log("done.");

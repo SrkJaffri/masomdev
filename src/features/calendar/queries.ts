@@ -6,7 +6,7 @@ import { prayerTimeLabels } from "@/features/prayer-calendar/config";
 import { formatStoredTime } from "@/features/prayer-calendar/lib/next-prayer";
 import type { DailyPrayerTimings, PrayerTimeSlot } from "@/features/prayer-calendar/types";
 import { logCmsError } from "@/lib/cms/logging";
-import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { createSupabaseCalendarClient } from "@/lib/supabase/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { publicTimingOrder } from "./config";
@@ -81,44 +81,74 @@ function buildSlots(row: CalendarDayRow | undefined): PrayerTimeSlot[] {
 }
 
 /**
- * Groups active events by the Gregorian day they resolve to.
+ * Builds the per-day event resolver used by every calendar view.
  *
- * When the Hijri anchor columns exist (migration applied) each event's date is
- * derived LIVE from its authoritative hijri identity + the current month
- * boundaries and overrides — the cached `event_date` is ignored because it goes
- * stale the moment an admin moves a month boundary. Before the migration, the
- * schema has no hijri columns, so events fall back to the cached `event_date`.
+ * Event model (migration 20260917140000):
+ *   • RECURRING Islamic events carry hijri_year = NULL — "same Hijri month +
+ *     same Hijri day = same event, every Hijri year". They match ANY displayed
+ *     day whose resolved Hijri date equals their (month, day), whether that
+ *     day belongs to 1446, 1447 or any other year (Gregorian 2025 spans two
+ *     Hijri years — this is what keeps both halves covered).
+ *   • Year-specific events keep an explicit hijri_year (e.g. the 1 AH
+ *     Masjid-e-Quba anniversary) and match only that exact Hijri date.
+ *   • Gregorian-only local events (no Hijri anchor) match their event_date.
+ *
+ * Recurrence identity is (hijri_month, hijri_day) — NEVER the cached
+ * `event_date`, which is reference data only.
+ *
+ * The final list per day is deduplicated on stable logical identity
+ * (anchor + normalized title + category) so a year-specific copy can never
+ * double-render alongside its recurring twin.
  */
-function buildEventMap(
+function createDayEventResolver(
   events: CalendarEventRow[],
   months: HijriMonthRow[],
   overrides: HijriOverrideRow[],
-): Map<string, CalendarEventRow[]> {
-  const hijriAnchored = events.length === 0 || "hijri_year" in events[0];
-  const eventMap = new Map<string, CalendarEventRow[]>();
-  const toGregorian = createHijriToGregorian(months, overrides);
+): (gregorianISO: string) => CalendarEventRow[] {
+  const resolveHijri = createHijriResolver(months, overrides);
+  const normalizeTitle = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
-  for (const event of events) {
-    let date: string | null = null;
-    if (
-      hijriAnchored &&
-      event.hijri_year !== null &&
-      event.hijri_month !== null &&
-      event.hijri_day !== null
-    ) {
-      date = toGregorian({
-        year: event.hijri_year,
-        month: event.hijri_month,
-        day: event.hijri_day,
-      });
+  return (gregorianISO: string) => {
+    const hijri = resolveHijri(gregorianISO);
+    const seen = new Set<string>();
+    const matched: CalendarEventRow[] = [];
+
+    for (const event of events) {
+      let matches = false;
+      let identity = "";
+      if (event.hijri_month !== null && event.hijri_day !== null) {
+        if (event.hijri_year === null) {
+          // Recurring: matches the day's Hijri (month, day) in ANY year.
+          matches =
+            hijri !== null &&
+            hijri.month === event.hijri_month &&
+            hijri.day === event.hijri_day;
+          identity =
+            hijri !== null
+              ? `h:${hijri.month}-${hijri.day}:${normalizeTitle(event.title)}:${event.category}`
+              : "";
+        } else {
+          // Year-specific: matches only that exact Hijri date.
+          matches =
+            hijri !== null &&
+            hijri.year === event.hijri_year &&
+            hijri.month === event.hijri_month &&
+            hijri.day === event.hijri_day;
+          identity = `h:${event.hijri_month}-${event.hijri_day}:${normalizeTitle(event.title)}:${event.category}`;
+        }
+      } else {
+        // Gregorian-only event.
+        matches = event.event_date === gregorianISO;
+        identity = `g:${event.event_date}:${normalizeTitle(event.title)}:${event.category}`;
+      }
+
+      if (matches && !seen.has(identity)) {
+        seen.add(identity);
+        matched.push(event);
+      }
     }
-    if (!date) date = event.event_date;
-
-    const list = eventMap.get(date) ?? [];
-    list.push(event);
-    eventMap.set(date, list);
-  }
-  return eventMap;
+    return matched;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +162,7 @@ function buildEventMap(
  */
 export async function getCalendarMonths(year: number): Promise<CalendarMonthView[]> {
   try {
-    const supabase = createSupabasePublicClient();
+    const supabase = createSupabaseCalendarClient();
     const start = `${year}-01-01`;
     const end = `${year}-12-31`;
 
@@ -174,7 +204,7 @@ export async function getCalendarMonths(year: number): Promise<CalendarMonthView
     const events = (eventsRes.data as CalendarEventRow[] | null) ?? [];
 
     const dayMap = new Map(days.map((row) => [row.gregorian_date, row] as const));
-    const eventMap = buildEventMap(events, months, overrides);
+    const resolveDayEvents = createDayEventResolver(events, months, overrides);
 
     const resolve: HijriResolver = createHijriResolver(months, overrides);
 
@@ -196,7 +226,7 @@ export async function getCalendarMonths(year: number): Promise<CalendarMonthView
           weekday: weekdayOf(date),
           hijri: resolve(date),
           timings: buildSlots(dayMap.get(date)),
-          events: (eventMap.get(date) ?? []).map((event) => ({
+          events: resolveDayEvents(date).map((event) => ({
             id: event.id,
             title: event.title,
             description: event.description,
@@ -228,7 +258,7 @@ export async function getCalendarMonth(
   if (month < 1 || month > 12) return null;
 
   try {
-    const supabase = createSupabasePublicClient();
+    const supabase = createSupabaseCalendarClient();
     const start = `${year}-${pad(month)}-01`;
     const end = `${year}-${pad(month)}-${pad(daysInMonth(year, month))}`;
 
@@ -270,7 +300,7 @@ export async function getCalendarMonth(
     const events = (eventsRes.data as CalendarEventRow[] | null) ?? [];
 
     const dayMap = new Map(days.map((row) => [row.gregorian_date, row] as const));
-    const eventMap = buildEventMap(events, months, overrides);
+    const resolveDayEvents = createDayEventResolver(events, months, overrides);
 
     const resolve: HijriResolver = createHijriResolver(months, overrides);
     const total = daysInMonth(year, month);
@@ -289,7 +319,7 @@ export async function getCalendarMonth(
         weekday: weekdayOf(date),
         hijri: resolve(date),
         timings: buildSlots(dayMap.get(date)),
-        events: (eventMap.get(date) ?? []).map((event) => ({
+        events: resolveDayEvents(date).map((event) => ({
           id: event.id,
           title: event.title,
           description: event.description,
@@ -312,7 +342,7 @@ export async function getCalendarMonth(
 export async function getTodayTimings(): Promise<DailyPrayerTimings> {
   const today = chicagoTodayISO();
   try {
-    const supabase = createSupabasePublicClient();
+    const supabase = createSupabaseCalendarClient();
     const [dayRes, monthsRes, overrideRes] = await Promise.all([
       supabase
         .from("calendar_days")
@@ -479,12 +509,9 @@ export async function getAllCalendarEvents(): Promise<CalendarEventAdminItem[]> 
 
   return events.map((event) => {
     let derived: string | null = null;
-    if (
-      hijriAnchored &&
-      event.hijri_year !== null &&
-      event.hijri_month !== null &&
-      event.hijri_day !== null
-    ) {
+    if (hijriAnchored && event.hijri_month !== null && event.hijri_day !== null) {
+      // NULL hijri_year = recurring event (resolves through the latest
+      // published boundary's year).
       derived = toGregorian({
         year: event.hijri_year,
         month: event.hijri_month,

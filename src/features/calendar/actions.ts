@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { requireAdmin } from "@/features/auth/guard";
 import { logAdminActivity } from "@/lib/cms/activity";
@@ -8,7 +8,7 @@ import { logCmsError } from "@/lib/cms/logging";
 import type { ActionResult } from "@/lib/cms/validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { calendarBasePath, hijriMonthName } from "./config";
+import { calendarBasePath, hijriMonthName, supportedCalendarYears } from "./config";
 import { createHijriToGregorian } from "./hijri";
 import {
   calendarDayFormSchema,
@@ -19,11 +19,17 @@ import {
 import type { HijriMonthRow, HijriOverrideRow } from "./types";
 
 // Every calendar mutation touches the admin module, the public calendar page,
-// and the homepage (whose header bar shows today's timings).
+// and the homepage (whose header bar shows today's timings). The tag purge
+// invalidates every cached calendar READ — including the ?month=/?year= query
+// variants of every supported year that revalidatePath cannot reach.
 function revalidateCalendar() {
+  revalidateTag("calendar");
   revalidatePath("/admin/calendar");
   revalidatePath(calendarBasePath);
   revalidatePath("/2026");
+  for (const year of supportedCalendarYears) {
+    revalidatePath(`${calendarBasePath}?year=${year}`);
+  }
   revalidatePath("/");
 }
 
@@ -295,12 +301,13 @@ function parseEventForm(formData: FormData) {
 
 /**
  * Derives the current Gregorian date for a Hijri identity from the live month
- * boundaries + overrides. Returns null when no boundary resolves it (e.g. an
- * unpublished month with no earlier boundary), in which case the form should
- * be rejected rather than saving a fabricated date.
+ * boundaries + overrides. A NULL hijri_year is a recurring event and resolves
+ * through the latest published boundary's year. Returns null when no boundary
+ * resolves it (e.g. an unpublished month with no earlier boundary), in which
+ * case the form should be rejected rather than saving a fabricated date.
  */
 async function resolveEventGregorianDate(data: {
-  hijri_year: number;
+  hijri_year: number | null;
   hijri_month: number;
   hijri_day: number;
 }): Promise<string | null> {

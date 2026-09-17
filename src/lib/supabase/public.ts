@@ -91,3 +91,21 @@ export function createSupabaseProgramClient() {
     global: { fetch: createCachedPublicFetch(["programs"]) },
   });
 }
+
+/**
+ * Tagged variant of the public client used for Calendar queries (prayer days,
+ * Hijri months, overrides, events). Fetch results are tagged with `"calendar"`
+ * so `revalidateTag("calendar")` from the admin calendar server actions purges
+ * every cached calendar read at once — including reads on pages that
+ * `revalidatePath` alone cannot reach (e.g. the ?month=/?year= query-param
+ * variants of the public calendar). Without the tag, out-of-band data changes
+ * (migrations, seed scripts) would stay stale for the full 1-hour TTL.
+ */
+export function createSupabaseCalendarClient() {
+  const { url, anonKey } = getSupabasePublicEnv();
+
+  return createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: createCachedPublicFetch(["calendar"]) },
+  });
+}

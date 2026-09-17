@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { calendarYear, isSupportedCalendarYear } from "@/features/calendar/config";
+import { isSupportedCalendarYear } from "@/features/calendar/config";
 import { getCalendarMonth } from "@/features/calendar/queries";
 import { logCmsError } from "@/lib/cms/logging";
 import { buildMonthlyCalendarPdf, LOGO_PATH } from "@/lib/pdf/calendar-month-pdf";
