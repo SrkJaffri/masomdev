@@ -1,7 +1,11 @@
 import { DownloadIcon, FileTextIcon, MapPinIcon } from "lucide-react";
 
 import { Container } from "@/components/layout/container";
-import { calendarYear, publicTimingOrder } from "@/features/calendar/config";
+import {
+  calendarYear,
+  hasProvisionalTimings,
+  publicTimingOrder,
+} from "@/features/calendar/config";
 import { NextPrayerCard } from "@/features/prayer-calendar/components/next-prayer-card";
 import { prayerTimeLabels } from "@/features/prayer-calendar/config";
 import type { CalendarMonthView } from "@/features/calendar/types";
@@ -168,6 +172,20 @@ function MonthSection({
   );
 }
 
+/** Subtle, single informational note under the month table for the baseline
+ * years whose prayer timings are the provisional 2026-template copy. */
+function ProvisionalTimingsNote({ year }: { year: number }) {
+  return (
+    <p
+      role="note"
+      className="rounded-xl border border-border/60 bg-card px-4 py-2.5 text-xs text-muted-foreground"
+    >
+      Prayer timings for {year} are based on the current MASOM schedule and may be
+      updated when year-specific timings are published.
+    </p>
+  );
+}
+
 function EmptyState() {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
@@ -258,6 +276,8 @@ export function CalendarView({
         </div>
 
         {hasData ? <MonthSection month={month} todayISO={todayISO} /> : <EmptyState />}
+
+        {hasProvisionalTimings(year) ? <ProvisionalTimingsNote year={year} /> : null}
       </Container>
     </div>
   );
