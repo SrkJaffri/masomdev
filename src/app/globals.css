@@ -109,14 +109,6 @@
   }
 }
 
-/* Custom cursor (desktop, fine-pointer devices only). The JS component adds
-   this class to <html>; it never applies on touch/coarse pointers, and the
-   prefers-reduced-motion guard in the component leaves the native cursor on. */
-html.custom-cursor-active,
-html.custom-cursor-active * {
-  cursor: none !important;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
