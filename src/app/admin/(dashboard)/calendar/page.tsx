@@ -1,5 +1,5 @@
 import { CalendarWorkspace } from "@/features/calendar/components/calendar-workspace";
-import { calendarYear } from "@/features/calendar/config";
+import { adminCalendarYear } from "@/features/calendar/config";
 import {
   getAllCalendarDays,
   getAllCalendarEvents,
@@ -9,7 +9,7 @@ import {
 
 export default async function AdminCalendarPage() {
   const [days, months, overrides, events] = await Promise.all([
-    getAllCalendarDays(calendarYear),
+    getAllCalendarDays(adminCalendarYear),
     getAllHijriMonths(),
     getAllHijriOverrides(),
     getAllCalendarEvents(),
@@ -17,7 +17,7 @@ export default async function AdminCalendarPage() {
 
   return (
     <CalendarWorkspace
-      year={calendarYear}
+      year={adminCalendarYear}
       days={days}
       months={months}
       overrides={overrides}

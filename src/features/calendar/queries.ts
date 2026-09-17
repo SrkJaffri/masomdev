@@ -9,10 +9,9 @@ import { logCmsError } from "@/lib/cms/logging";
 import { createSupabaseCalendarClient } from "@/lib/supabase/public";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { publicTimingOrder } from "./config";
+import { adminCalendarYear, publicTimingOrder } from "./config";
 import {
   createHijriResolver,
-  createHijriToGregorian,
   type HijriResolver,
 } from "./hijri";
 import type {
@@ -447,11 +446,23 @@ export async function getCalendarDayByDate(date: string): Promise<CalendarDayRow
   return (data as CalendarDayRow | null) ?? null;
 }
 
+/**
+ * The Hijri month boundaries whose Gregorian start falls inside the ADMIN
+ * calendar year (see {@link adminCalendarYear}). Admin edits the shipped year
+ * (2026 → Hijri 1447/1448); the multi-year boundaries for the other public
+ * years stay in the database untouched — only this ADMIN list is scoped.
+ * Note a boundary that began in late 2025 (e.g. Rajab 1447) is intentionally
+ * absent from the list even though its month continues into January 2026:
+ * the calendar engine still reads it from the full boundary set when
+ * resolving dates.
+ */
 export async function getAllHijriMonths(): Promise<HijriMonthAdminItem[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("hijri_months")
     .select("*")
+    .gte("gregorian_start", `${adminCalendarYear}-01-01`)
+    .lte("gregorian_start", `${adminCalendarYear}-12-31`)
     .order("gregorian_start", { ascending: true });
 
   if (error) {
@@ -461,11 +472,18 @@ export async function getAllHijriMonths(): Promise<HijriMonthAdminItem[]> {
   return (data as HijriMonthRow[] | null) ?? [];
 }
 
+/**
+ * Per-day Hijri overrides whose Gregorian date falls inside the ADMIN calendar
+ * year. Overrides for other years (kept for the public multi-year calendar)
+ * are excluded from this admin list only — nothing is deleted.
+ */
 export async function getAllHijriOverrides(): Promise<HijriOverrideAdminItem[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("hijri_overrides")
     .select("*")
+    .gte("gregorian_date", `${adminCalendarYear}-01-01`)
+    .lte("gregorian_date", `${adminCalendarYear}-12-31`)
     .order("gregorian_date", { ascending: true });
 
   if (error) {
@@ -475,14 +493,35 @@ export async function getAllHijriOverrides(): Promise<HijriOverrideAdminItem[]> 
   return (data as HijriOverrideRow[] | null) ?? [];
 }
 
+/**
+ * The canonical event list resolved INTO the ADMIN calendar year (2026).
+ *
+ * Recurring Islamic events (hijri_year = NULL) repeat every Hijri year, so a
+ * single canonical row has no single "the" Gregorian date — the admin Date
+ * column must show this year's occurrence. Resolving a recurring anchor
+ * through `createHijriToGregorian` would pin it to the LATEST published
+ * boundary's Hijri year (2029 today), which is how 2025–2030 dates leaked in
+ * after the public calendar went multi-year. Instead the events are matched
+ * FORWARD against the resolved Hijri date of every day of the admin year —
+ * the same engine the public calendar uses ({@link createDayEventResolver}) —
+ * so each row shows the occurrence whose Gregorian date falls between
+ * Jan 1 and Dec 31 of the admin year (spanning both Hijri years that overlap
+ * Gregorian 2026: 1447 and 1448).
+ *
+ * Event identity (ids, titles, anchors, recurrence) is untouched — only the
+ * displayed occurrence changes. An event that does not occur inside the admin
+ * year is excluded rather than shown with a foreign-year date; the cached
+ * `event_date` is used only as a last-resort fallback for rows with no Hijri
+ * anchor (gregorian-only local events, which carry their real date there).
+ */
 export async function getAllCalendarEvents(): Promise<CalendarEventAdminItem[]> {
   const supabase = await createSupabaseServerClient();
   const [eventsRes, monthsRes, overridesRes] = await Promise.all([
     supabase
       .from("calendar_events")
       .select("*")
-      .order("event_date", { ascending: true })
-      .order("sort_order", { ascending: true }),
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
     supabase.from("hijri_months").select("*"),
     supabase.from("hijri_overrides").select("*"),
   ]);
@@ -505,23 +544,54 @@ export async function getAllCalendarEvents(): Promise<CalendarEventAdminItem[]> 
   const overrides = (overridesRes.data as HijriOverrideRow[] | null) ?? [];
 
   const hijriAnchored = events.length === 0 || "hijri_year" in events[0];
-  const toGregorian = createHijriToGregorian(months, overrides);
 
-  return events.map((event) => {
-    let derived: string | null = null;
-    if (hijriAnchored && event.hijri_month !== null && event.hijri_day !== null) {
-      // NULL hijri_year = recurring event (resolves through the latest
-      // published boundary's year).
-      derived = toGregorian({
-        year: event.hijri_year,
-        month: event.hijri_month,
-        day: event.hijri_day,
-      });
+  // Resolve each calendar_day of the admin year once (365 resolver calls),
+  // then group the events matched on that day. Only this year's calendar_days
+  // are fetched — never the whole multi-year table.
+  const daysRes = await supabase
+    .from("calendar_days")
+    .select("gregorian_date")
+    .gte("gregorian_date", `${adminCalendarYear}-01-01`)
+    .lte("gregorian_date", `${adminCalendarYear}-12-31`)
+    .order("gregorian_date", { ascending: true });
+  if (daysRes.error) {
+    logCmsError("calendar:getAllEvents:days", daysRes.error);
+    return [];
+  }
+  const dayDates =
+    ((daysRes.data as Array<{ gregorian_date: string }> | null) ?? []).map(
+      (row) => row.gregorian_date,
+    );
+
+  const resolveDayEvents = createDayEventResolver(events, months, overrides);
+  const resolvedById = new Map<string, string>(); // event id → 2026 occurrence
+  for (const date of dayDates) {
+    for (const event of resolveDayEvents(date)) {
+      // First occurrence wins; the dedup inside the resolver guarantees the
+      // same event never matches twice in one year.
+      if (!resolvedById.has(event.id)) resolvedById.set(event.id, date);
     }
-    return {
-      ...event,
-      derived_gregorian_date: derived ?? event.event_date,
-      hijri_anchored: hijriAnchored,
-    };
-  });
+  }
+
+  return events
+    .map((event) => {
+      const resolved = resolvedById.get(event.id) ?? null;
+      const hijriDerived =
+        resolved ??
+        (hijriAnchored && event.hijri_month !== null && event.hijri_day !== null
+          ? null
+          : event.event_date);
+      return {
+        ...event,
+        derived_gregorian_date: hijriDerived ?? event.event_date,
+        hijri_anchored: hijriAnchored,
+      };
+    })
+    .filter(
+      // Hide events with no occurrence inside the admin year (instead of
+      // showing their latest/foreign-year occurrence).
+      (event) =>
+        event.derived_gregorian_date.startsWith(`${adminCalendarYear}-`),
+    )
+    .sort((a, b) => a.derived_gregorian_date.localeCompare(b.derived_gregorian_date));
 }

@@ -55,6 +55,16 @@ export const publicTimingOrder: PrayerTimeKey[] = [
 export const calendarYear = 2026;
 
 /**
+ * The single Gregorian year the ADMIN calendar workspace manages. The admin
+ * interface is intentionally year-scoped — it edits the verified published
+ * year — while the public calendar serves every supported year. Kept an
+ * explicit constant (NOT "the current year") so the admin workflow always
+ * targets the shipped calendar, and so making Admin multi-year later is a
+ * one-line change here.
+ */
+export const adminCalendarYear = calendarYear;
+
+/**
  * Every Gregorian year with a calendar in the database. 2025 is the
  * historical pilot (official imported data) and 2026 is the shipped year with
  * verified published data. 2023/2024/2027/2028/2029 are structured baseline
