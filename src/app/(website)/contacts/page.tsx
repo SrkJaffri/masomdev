@@ -4,7 +4,7 @@ import { Container } from "@/components/layout/container";
 import { ParallaxBackground } from "@/components/website/parallax-background";
 import { Reveal } from "@/components/website/reveal";
 import { siteConfig } from "@/config/site";
-import { ContactForm } from "@/features/contacts/components/contact-form";
+import { ContactForm } from "@/features/contact/components/contact-form";
 import { createMetadata } from "@/lib/seo/metadata";
 
 export const metadata = createMetadata({

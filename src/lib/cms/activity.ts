@@ -10,7 +10,8 @@ export type ActivityModule =
   | "program"
   | "announcement"
   | "calendar"
-  | "newsletter";
+  | "newsletter"
+  | "contact";
 
 export type ActivityRecord = {
   id: string;

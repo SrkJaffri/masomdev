@@ -5,6 +5,7 @@ import {
   ImageIcon,
   MailIcon,
   MegaphoneIcon,
+  MessageSquareIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -32,6 +33,7 @@ const MODULE_META: Record<
   announcement: { label: "Announcement", icon: MegaphoneIcon },
   calendar: { label: "Calendar", icon: CalendarIcon },
   newsletter: { label: "Newsletter", icon: MailIcon },
+  contact: { label: "Contact message", icon: MessageSquareIcon },
 };
 
 function actionMeta(action: string): {

@@ -9,6 +9,7 @@ import {
   LogOutIcon,
   MailIcon,
   MegaphoneIcon,
+  MessageSquareIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   XIcon,
@@ -68,6 +69,7 @@ function buildSections(): NavSection[] {
         { href: "/admin/announcements", label: "Announcements", icon: MegaphoneIcon, accent: "violet", countKey: "announcements" },
         { href: "/admin/calendar", label: "Calendar", icon: CalendarIcon, accent: "amber", countKey: "calendar" },
         { href: "/admin/newsletter", label: "Newsletter", icon: MailIcon, accent: "teal", countKey: "newsletter" },
+        { href: "/admin/contact-messages", label: "Contact Messages", icon: MessageSquareIcon, accent: "blue", countKey: "contact" },
       ],
     },
   ];

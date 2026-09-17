@@ -59,6 +59,47 @@ export type DonationEmailConfig = {
 const FALSEY_VALUES = new Set(["0", "false", "no", "off"]);
 
 /**
+ * Server-only Resend configuration for contact-form notifications. Returns
+ * null when a required variable is unset so the caller can degrade safely
+ * (the DB insert still happens first — email is best-effort). Never exposes
+ * values to the browser.
+ */
+export type ContactEmailConfig = {
+  apiKey: string;
+  from: string;
+  to: string;
+};
+
+export function getContactEmailConfig(): ContactEmailConfig | null {
+  if (typeof window !== "undefined") return null;
+
+  const apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
+  const from = process.env.RESEND_FROM_EMAIL?.trim() ?? "";
+  // Hierarchy: dedicated contact recipient, else the donation notification
+  // recipient (same office), else the secretary address from site config.
+  const to =
+    process.env.CONTACT_NOTIFICATION_EMAIL?.trim() ||
+    process.env.DONATION_NOTIFICATION_EMAIL?.trim() ||
+    "secretary@masom.com";
+
+  if (!apiKey || !from) return null;
+
+  return { apiKey, from, to };
+}
+
+/**
+ * Server-only Cloudflare Turnstile secret. Returns null when unset so callers
+ * can decide whether verification is enforceable. Never exposed to the
+ * browser — only NEXT_PUBLIC_TURNSTILE_SITE_KEY is public.
+ */
+export function getTurnstileSecret(): string | null {
+  if (typeof window !== "undefined") return null;
+
+  const secret = process.env.TURNSTILE_SECRET_KEY?.trim() ?? "";
+  return secret || null;
+}
+
+/**
  * Server-only Resend configuration for donation submissions. Returns null when
  * any variable is unset so the caller can fail with a friendly message instead
  * of crashing. Never exposes values to the browser.
