@@ -1,10 +1,10 @@
 /**
  * End-to-end verification of the MASOM YouTube data layer.
  *
- * Mirrors the exact request src/features/youtube/queries.ts makes against the
- * YouTube Data API (same endpoint, params, channel ID, and featured/recent
- * logic) so you can validate a real YOUTUBE_API_KEY without a browser or dev
- * server.
+ * Mirrors the exact request flow of src/features/youtube/queries.ts against
+ * the YouTube Data API — uploads playlist (playlistItems.list) + one batched
+ * videos.list with liveStreamingDetails. NO search.list is used, matching the
+ * production homepage path, so this script costs 2 quota units per run.
  *
  * Usage:
  *   node --env-file=.env.local scripts/verify-youtube.mjs
@@ -12,7 +12,7 @@
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 const YOUTUBE_CHANNEL_ID = "UCLE_Z6NZIg05Zzz1tn209sg";
-const YOUTUBE_MAX_RESULTS = 8;
+const CANDIDATE_COUNT = 10;
 
 const apiKey = process.env.YOUTUBE_API_KEY?.trim();
 
@@ -25,61 +25,54 @@ if (!apiKey) {
   process.exit(1);
 }
 
-async function fetchStreamsByType(eventType) {
-  const params = new URLSearchParams({
-    part: "snippet",
-    channelId: YOUTUBE_CHANNEL_ID,
-    type: "video",
-    eventType,
-    order: "date",
-    maxResults: String(YOUTUBE_MAX_RESULTS),
-    key: apiKey,
+/** uploads playlist = UU + channel id without the leading UC. */
+function uploadsPlaylistId(channelId) {
+  return `UU${channelId.slice(2)}`;
+}
+
+/**
+ * Mirrors callYouTube in queries.ts: key via the `x-goog-api-key` header —
+ * never the URL — so no console/log output can contain the key.
+ */
+async function callApi(path, params) {
+  const search = new URLSearchParams(params);
+  const url = `${YOUTUBE_API_BASE}/${path}?${search.toString()}`;
+  console.log(`\n== ${path} ==`);
+  console.log(url);
+
+  const response = await fetch(url, {
+    headers: { accept: "application/json", "x-goog-api-key": apiKey },
   });
-
-  const url = `${YOUTUBE_API_BASE}/search?${params.toString()}`;
-  console.log(`\n== search.list eventType=${eventType} ==`);
-  console.log(url.replace(`key=${apiKey}`, "key=***"));
-
-  const response = await fetch(url, { headers: { accept: "application/json" } });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`HTTP ${response.status}: ${body.slice(0, 500)}`);
   }
-
   const data = await response.json();
   if (data.error?.message) {
     throw new Error(`API error: ${data.error.message}`);
   }
-
-  return (data.items ?? []).map((item) => ({
-    videoId: item.id?.videoId,
-    title: item.snippet?.title,
-    publishedAt: item.snippet?.publishedAt,
-    liveStatus: item.snippet?.liveBroadcastContent ?? "none",
-    thumbnailUrl:
-      item.snippet?.thumbnails?.maxres?.url ??
-      item.snippet?.thumbnails?.standard?.url ??
-      item.snippet?.thumbnails?.high?.url ??
-      item.snippet?.thumbnails?.medium?.url ??
-      item.snippet?.thumbnails?.default?.url ??
-      null,
-  }));
+  return data;
 }
 
-function uniqueById(streams) {
-  const seen = new Set();
-  return streams.filter((s) => {
-    if (!s.videoId || seen.has(s.videoId)) return false;
-    seen.add(s.videoId);
-    return true;
-  });
+function pickThumbnail(thumbs) {
+  if (!thumbs) return null;
+  return (
+    thumbs.maxres?.url ??
+    thumbs.standard?.url ??
+    thumbs.high?.url ??
+    thumbs.medium?.url ??
+    thumbs.default?.url ??
+    null
+  );
 }
 
-function pickFeatured(live, completed, upcoming) {
-  if (live.length > 0) return { featured: live[0], recent: completed, isLive: true };
-  if (completed.length > 0) return { featured: completed[0], recent: completed.slice(1), isLive: false };
-  if (upcoming.length > 0) return { featured: upcoming[0], recent: upcoming.slice(1), isLive: false };
-  return { featured: null, recent: [], isLive: false };
+/** Mirrors loadLiveStatus classification exactly. */
+function classify(item) {
+  const details = item.liveStreamingDetails;
+  const broadcast = item.snippet?.liveBroadcastContent ?? "none";
+  if (broadcast === "live" || broadcast === "upcoming") return broadcast;
+  if (details?.actualStartTime && !details.actualEndTime) return "live";
+  return "none";
 }
 
 function truncate(text, length = 60) {
@@ -87,49 +80,74 @@ function truncate(text, length = 60) {
   return text.length > length ? `${text.slice(0, length - 1)}…` : text;
 }
 
-function printStreams(label, streams) {
-  console.log(`\n${label} (${streams.length}):`);
-  if (streams.length === 0) {
+// 1) Newest uploads from the uploads playlist.
+const playlist = await callApi("playlistItems", {
+  part: "snippet",
+  playlistId: uploadsPlaylistId(YOUTUBE_CHANNEL_ID),
+  maxResults: String(CANDIDATE_COUNT),
+});
+
+const videoIds = (playlist.items ?? [])
+  .map((item) => item.snippet?.resourceId?.videoId)
+  .filter(Boolean);
+
+console.log(`\nNewest uploads found: ${videoIds.length}`);
+if (videoIds.length === 0) {
+  console.warn("WARNING: uploads playlist returned no items.");
+  process.exit(1);
+}
+
+// 2) One batched videos.list with liveStreamingDetails.
+const videos = await callApi("videos", {
+  part: "snippet,liveStreamingDetails",
+  id: videoIds.join(","),
+});
+
+const rows = (videos.items ?? []).map((item) => ({
+  videoId: item.id,
+  title: item.snippet?.title,
+  publishedAt: item.snippet?.publishedAt,
+  thumbnailUrl: pickThumbnail(item.snippet?.thumbnails),
+  liveStatus: classify(item),
+  scheduledStartTime: item.liveStreamingDetails?.scheduledStartTime ?? null,
+  actualStartTime: item.liveStreamingDetails?.actualStartTime ?? null,
+  actualEndTime: item.liveStreamingDetails?.actualEndTime ?? null,
+  isBroadcast: Boolean(item.liveStreamingDetails),
+}));
+
+rows.sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
+
+const live = rows.filter((r) => r.liveStatus === "live");
+const upcoming = rows.filter((r) => r.liveStatus === "upcoming");
+const completed = rows.filter((r) => r.isBroadcast && r.liveStatus !== "live" && r.liveStatus !== "upcoming");
+const ordinary = rows.filter((r) => !r.isBroadcast);
+
+function printRows(label, list) {
+  console.log(`\n${label} (${list.length}):`);
+  if (list.length === 0) {
     console.log("  (none)");
     return;
   }
-  for (const s of streams) {
-    console.log(
-      `  [${s.liveStatus}] ${s.videoId}  ${truncate(s.title)}  (${s.publishedAt})`,
-    );
-    if (s.thumbnailUrl) console.log(`      thumb: ${s.thumbnailUrl}`);
+  for (const r of list) {
+    console.log(`  [${r.liveStatus}] ${r.videoId}  ${truncate(r.title)}  (${r.publishedAt})`);
   }
 }
 
-try {
-  const [live, completed, upcoming] = await Promise.all([
-    fetchStreamsByType("live"),
-    fetchStreamsByType("completed"),
-    fetchStreamsByType("upcoming"),
-  ]);
+printRows("LIVE", live);
+printRows("UPCOMING", upcoming);
+printRows("COMPLETED BROADCASTS", completed);
+printRows("ORDINARY UPLOADS (skipped)", ordinary);
 
-  const liveStreams = uniqueById(live);
-  const completedStreams = uniqueById(completed);
-  const upcomingStreams = uniqueById(upcoming);
+console.log("\n== Result (mirrors getYouTubeStreams) ==");
+const featured = live[0] ?? completed[0] ?? upcoming[0] ?? null;
+const isLive = Boolean(live[0]);
+console.log(`isLive:   ${isLive}`);
+console.log(`featured: ${featured ? `${featured.videoId} — ${truncate(featured.title, 70)}` : "null"}`);
+const recentPool = rows.filter((r) => r.isBroadcast && (!featured || r.videoId !== featured.videoId));
+console.log(`recent:   ${Math.min(recentPool.length, 9)} stream(s)`);
 
-  printStreams("LIVE", liveStreams);
-  printStreams("COMPLETED", completedStreams);
-  printStreams("UPCOMING", upcomingStreams);
-
-  const { featured, recent, isLive } = pickFeatured(liveStreams, completedStreams, upcomingStreams);
-
-  console.log("\n== Result (mirrors getYouTubeStreams) ==");
-  console.log(`isLive:   ${isLive}`);
-  console.log(`featured: ${featured ? `${featured.videoId} — ${truncate(featured.title, 70)}` : "null"}`);
-  console.log(`recent:   ${recent.length} stream(s)`);
-
-  if (!featured) {
-    console.warn("\nWARNING: no live, completed, or upcoming streams returned.");
-  } else {
-    console.log("\nOK: YouTube data layer verified against the live API.");
-  }
-} catch (error) {
-  console.error("\nVERIFICATION FAILED:");
-  console.error(error.message ?? error);
-  process.exit(1);
+if (!featured) {
+  console.warn("\nWARNING: no live, completed, or upcoming broadcasts among recent uploads.");
+} else {
+  console.log("\nOK: uploads-playlist + videos.list flow verified against the live API (0 search.list calls).");
 }
