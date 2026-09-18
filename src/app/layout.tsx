@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     description:
       "MASOM — Midwest Association of Shia Organized Muslims: an Imambargah in Chicago serving the community with majalis, programs, an Islamic school, funeral services and Wadi-e-MASOM.",
     locale: siteConfig.ogLocale,
-    images: [{ url: siteConfig.assets.ogImage, width: 1200, height: 630, alt: "MASOM — Midwest Association of Shia Organized Muslims" }],
+    images: [{ url: siteConfig.assets.ogImage, width: 1200, height: 670, alt: "MASOM — Midwest Association of Shia Organized Muslims" }],
   },
   twitter: {
     card: "summary_large_image",

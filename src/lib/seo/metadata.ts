@@ -47,7 +47,7 @@ export function createMetadata({
         {
           url: ogImage,
           width: 1200,
-          height: 630,
+          height: 670,
           alt: "MASOM — Midwest Association of Shia Organized Muslims",
         },
       ],
