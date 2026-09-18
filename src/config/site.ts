@@ -52,6 +52,19 @@ export const siteConfig = {
     youtube: "https://www.youtube.com/channel/UCLE_Z6NZIg05Zzz1tn209sg",
     whatsapp: "https://chat.whatsapp.com/LbReeM8ts7VJoC7yMOPqSI",
   },
+  /**
+   * Approved donation payment data — the single source of truth shared by the
+   * Donate page, the AI donation tool and the chat UI. The Zelle QR is the
+   * client-supplied APPROVED payment QR (/donations/zelle-masom-qr.jpeg); it
+   * is deliberately a different asset from assets.qrCode, which stays the
+   * WEBSITE QR used in the footer.
+   */
+  donation: {
+    zelleEmail: "donate@masom.com",
+    zelleQr: { src: "/donations/zelle-masom-qr.jpeg", width: 556, height: 677 },
+    zelleQrAlt: "MASOM Zelle payment QR code",
+    mailingAddress: "MASOM, 4353 W Lawrence Ave, Chicago, IL, 60630",
+  },
   links: {
     donate: "/donate",
     constitution: "https://masom.com/org/masomByLaws.pdf",

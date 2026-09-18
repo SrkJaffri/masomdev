@@ -51,10 +51,17 @@ export const ASSISTANT_MESSAGES = {
     "Something went wrong on our side. Please try again in a moment, or contact us through the Contact page.",
 } as const;
 
-/** Suggested opening questions shown as chips in an empty chat. */
+/**
+ * Suggested opening questions shown as chips in an empty chat.
+ *
+ * Global English UI copy — identical for every visitor regardless of country,
+ * IP, timezone or browser locale. Never geo-localized: the assistant's reply
+ * language mirrors the visitor's latest actual message instead (see the
+ * system prompt's Style rules).
+ */
 export const ASSISTANT_SUGGESTIONS = [
-  "Aaj ki namaz ki timings kya hain?",
-  "Wiladat Imam Hasan Askari (AS) kab hai?",
+  "What are today's prayer times?",
   "What programs are coming up?",
+  "What Islamic events are coming up?",
   "How can I donate to MASOM?",
 ] as const;

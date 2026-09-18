@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { headers } from "next/headers";
 
+import { siteConfig } from "@/config/site";
 import { ASSISTANT_MESSAGES, ASSISTANT_LIMITS } from "@/features/assistant/config";
 import { runAssistant } from "@/features/assistant/run";
 import { chatRequestSchema } from "@/features/assistant/schema";
@@ -114,7 +115,39 @@ export async function POST(request: Request) {
     return json({ ok: false, error: ASSISTANT_MESSAGES.genericError }, 502);
   }
 
-  return json({ ok: true, reply, usedTools: result.usedTools }, 200);
+  const paymentCard = paymentCardForTools(result.usedTools);
+  return json(
+    {
+      ok: true,
+      reply,
+      usedTools: result.usedTools,
+      ...(paymentCard ? { paymentCard } : {}),
+    },
+    200,
+  );
+}
+
+/**
+ * Deterministic Zelle payment card, attached ONLY when a donation/payment tool
+ * answered this turn. Fields come from the central donation config — never
+ * from model output — so the QR shown in chat is always the approved asset at
+ * the approved path, and cannot be faked or redirected by the model.
+ */
+function paymentCardForTools(usedTools: string[]) {
+  const relevant = usedTools.some((tool) =>
+    ["getDonationInfo", "registerDonationIntent"].includes(tool),
+  );
+  if (!relevant) return undefined;
+
+  return {
+    method: "Zelle / Quickpay",
+    email: siteConfig.donation.zelleEmail,
+    qrSrc: siteConfig.donation.zelleQr.src,
+    qrAlt: siteConfig.donation.zelleQrAlt,
+    qrWidth: siteConfig.donation.zelleQr.width,
+    qrHeight: siteConfig.donation.zelleQr.height,
+    donatePath: siteConfig.links.donate,
+  } as const;
 }
 
 /** Only POST is supported — no GET probe surface. */

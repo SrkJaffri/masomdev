@@ -1,12 +1,20 @@
 "use client";
 
-import { AlertCircleIcon, SendHorizonalIcon, XIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  ArrowRightIcon,
+  BanknoteIcon,
+  SendHorizonalIcon,
+  XIcon,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 import { ASSISTANT_LIMITS, ASSISTANT_MESSAGES, ASSISTANT_SUGGESTIONS } from "../config";
-import type { ChatMessage, ChatResponseBody } from "../types";
+import type { ChatMessage, ChatResponseBody, PaymentCard } from "../types";
 
 /**
  * The chat surface. Lazy-loaded: this chunk only downloads once a visitor
@@ -19,6 +27,8 @@ import type { ChatMessage, ChatResponseBody } from "../types";
 type PanelMessage = ChatMessage & {
   /** Error notices are shown in the transcript but never sent back as history. */
   isError?: boolean;
+  /** Deterministic Zelle card — attached by the server, never model text. */
+  paymentCard?: PaymentCard;
 };
 
 const SESSION_STORAGE_KEY = "masom-assistant-session";
@@ -136,7 +146,14 @@ export function ChatPanel({
 
         setMessages((current) =>
           payload.ok
-            ? [...current, { role: "assistant", content: payload.reply }]
+            ? [
+                ...current,
+                {
+                  role: "assistant",
+                  content: payload.reply,
+                  paymentCard: payload.paymentCard,
+                },
+              ]
             : [...current, { role: "assistant", content: payload.error, isError: true }],
         );
       } catch (error) {
@@ -204,13 +221,14 @@ export function ChatPanel({
         <Bubble role="assistant">{welcomeMessage}</Bubble>
 
         {messages.map((message, index) => (
-          <Bubble
-            key={`${message.role}-${index}`}
-            role={message.role}
-            isError={message.isError}
-          >
-            {message.content}
-          </Bubble>
+          <div key={`${message.role}-${index}`} className="space-y-2">
+            <Bubble role={message.role} isError={message.isError}>
+              {message.content}
+            </Bubble>
+            {message.role === "assistant" && message.paymentCard ? (
+              <PaymentCardView card={message.paymentCard} />
+            ) : null}
+          </div>
         ))}
 
         {pending ? (
@@ -306,6 +324,55 @@ export function ChatPanel({
           {ASSISTANT_MESSAGES.tooLong}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Deterministic Zelle payment card — rendered under an assistant reply only
+ * when the server attached one (donation tools ran this turn). The QR image
+ * and the Zelle email come from the server's central config, never from model
+ * text, and the card is kept scan-friendly: contain-fit, no masks or overlays.
+ */
+function PaymentCardView({ card }: { card: PaymentCard }) {
+  return (
+    <div className="flex justify-start" data-testid="zelle-payment-card">
+      <div className="w-[85%] max-w-[21rem] overflow-hidden rounded-2xl border border-brand-500/30 bg-card shadow-card">
+        <div className="flex items-center gap-2 bg-brand-500/10 px-4 py-2.5">
+          <BanknoteIcon className="size-4 shrink-0 text-brand-600" aria-hidden="true" />
+          <p className="truncate text-sm font-semibold text-ink-800">{card.method}</p>
+        </div>
+        <div className="flex flex-col items-center gap-3 px-4 py-4">
+          <Image
+            src={card.qrSrc}
+            alt={card.qrAlt}
+            width={card.qrWidth}
+            height={card.qrHeight}
+            className="h-auto w-56 object-contain sm:w-60"
+            sizes="240px"
+          />
+          <p className="text-center text-xs leading-relaxed text-muted-foreground">
+            Scan the QR code using your bank&apos;s Zelle-enabled app, or send your donation to{" "}
+            <a
+              href={`mailto:${card.email}`}
+              className="font-semibold break-all text-brand-600 transition-colors hover:text-brand-500"
+            >
+              {card.email}
+            </a>
+          </p>
+          <Link
+            href={card.donatePath}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-2 text-xs font-semibold text-white",
+              "transition-colors hover:bg-brand-600 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:outline-none",
+              "motion-reduce:transition-none",
+            )}
+          >
+            Open Donate Page
+            <ArrowRightIcon className="size-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

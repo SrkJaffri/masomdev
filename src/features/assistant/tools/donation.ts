@@ -27,8 +27,11 @@ import { type AssistantTool, invalidArguments } from "./types";
  *   donation records, so donor data is never sent to the model.
  */
 
-const DONATION_EMAIL = "donate@masom.com";
-const MAILING_ADDRESS = "MASOM, 4353 W Lawrence Ave, Chicago, IL, 60630";
+const DONATION_EMAIL = siteConfig.donation.zelleEmail;
+const MAILING_ADDRESS = siteConfig.donation.mailingAddress;
+/** Approved client-supplied Zelle QR — a DIFFERENT asset from the footer's
+ * website QR (/brand/qr-code-masom.webp). Never swap the two. */
+const DONATION_QR = siteConfig.donation.zelleQr.src;
 
 // ---------------------------------------------------------------------------
 // getDonationInfo
@@ -73,9 +76,12 @@ export const getDonationInfoTool: AssistantTool = {
         memoNote:
           "For Sadaqa and Fitra, the donor should mention Syed or Non-Syed in the Zelle memo or on the check.",
         donatePath: siteConfig.links.donate,
-        // Spec §32: no approved Zelle/Quickpay QR asset exists in this project,
-        // so none is offered. Do not describe or invent one.
-        paymentQrAvailable: false,
+        // Approved Zelle/Quickpay QR (client-supplied) is now available and is
+        // rendered by the chat UI as a deterministic payment card.
+        paymentQrAvailable: true,
+        paymentQrPath: DONATION_QR,
+        paymentQrAlt: siteConfig.donation.zelleQrAlt,
+        zelleEmail: DONATION_EMAIL,
         rules: [
           "MASOM does NOT process payments on the website.",
           "NEVER ask for a card number, CVV, bank account number, routing number, online-banking password or Zelle login.",
@@ -202,13 +208,16 @@ export const registerDonationIntentTool: AssistantTool = {
           instruction:
             "Tell the visitor exactly: 'Your donation information has been registered.' " +
             "Then explain that MASOM has NOT taken any payment, and that they still need " +
-            `to send it themselves via Zelle/Quickpay to ${DONATION_EMAIL} or by check to ` +
+            `to send it themselves via Zelle/Quickpay to ${DONATION_EMAIL} — an approved ` +
+            "Zelle QR is also shown below — or by check to " +
             `${MAILING_ADDRESS}. Also point them to the Donate page (${siteConfig.links.donate}) ` +
             "for the full details. Do NOT say 'your donation was received', 'payment " +
             "successful', 'paid', or anything implying money has changed hands.",
           paymentEmail: DONATION_EMAIL,
           mailingAddress: MAILING_ADDRESS,
           donatePath: siteConfig.links.donate,
+          paymentQrAvailable: true,
+          paymentQrPath: DONATION_QR,
         },
       };
     } catch (error) {

@@ -6,6 +6,7 @@ import {
   PhoneIcon,
   SendIcon,
 } from "lucide-react";
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { Container } from "@/components/layout/container";
@@ -167,13 +168,27 @@ export default function DonatePage() {
                 <p>
                   Please login to your Bank/Zelle account and make payments using our email:{" "}
                   <a
-                    href="mailto:donate@masom.com"
+                    href={`mailto:${siteConfig.donation.zelleEmail}`}
                     className="font-semibold text-brand-600 transition-colors hover:text-brand-500"
                   >
-                    donate@masom.com
+                    {siteConfig.donation.zelleEmail}
                   </a>
                   .
                 </p>
+                <div className="mt-5 flex flex-col items-center gap-3">
+                  <Image
+                    src={siteConfig.donation.zelleQr.src}
+                    alt={siteConfig.donation.zelleQrAlt}
+                    width={siteConfig.donation.zelleQr.width}
+                    height={siteConfig.donation.zelleQr.height}
+                    className="h-auto w-72 max-w-full object-contain sm:w-80"
+                    sizes="(max-width: 640px) 90vw, 320px"
+                  />
+                  <p className="text-center text-sm leading-relaxed text-muted-foreground">
+                    Scan the QR code using your bank&apos;s Zelle-enabled app, or send your
+                    donation to {siteConfig.donation.zelleEmail}.
+                  </p>
+                </div>
               </MethodCard>
             </Reveal>
 

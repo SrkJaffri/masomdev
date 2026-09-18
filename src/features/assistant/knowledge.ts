@@ -201,7 +201,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     ],
     content: [
       "MASOM accepts donations and Sadaqat in two approved ways.",
-      "1) Zelle / Quickpay (Preferred): log in to your own bank or Zelle account and send payment to the MASOM email donate@masom.com.",
+      "1) Zelle / Quickpay (Preferred): log in to your own bank or Zelle account and send payment to the MASOM email donate@masom.com. An approved Zelle QR code is shown on the Donate page and can be scanned with any bank's Zelle app.",
       "2) Regular Mail: send checks to MASOM, 4353 W Lawrence Ave, Chicago, IL, 60630.",
       "Note: for Sadaqa and Fitra, please mention Syed or Non-Syed in the Zelle memo or on your check.",
       "The Donate page also has an online form to share donation details with MASOM — it is a submission form and does not process payment.",
