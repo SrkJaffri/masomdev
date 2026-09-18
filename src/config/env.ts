@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const DEFAULT_SITE_URL = "http://localhost:3000";
+// Production-safe default: if NEXT_PUBLIC_SITE_URL is ever missing from a
+// deployment environment, SEO/canonical/OG URLs must still point at the real
+// canonical host — never localhost. Local development overrides this via
+// .env.local (NEXT_PUBLIC_SITE_URL=http://localhost:3000).
+const DEFAULT_SITE_URL = "https://www.masom.com";
 
 const siteUrlSchema = z.url();
 

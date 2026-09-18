@@ -17,7 +17,12 @@ export function createMetadata({
   image,
   noIndex = false,
 }: CreateMetadataInput = {}): Metadata {
-  const socialTitle = title ?? siteConfig.title;
+  // A real <title> on every page. Next.js merges page metadata with the root
+  // layout SHALLOWLY, so returning title: undefined here would erase the
+  // root title.default — which is exactly how the homepage once rendered
+  // with no <title> tag at all.
+  const pageTitle = title ?? siteConfig.title;
+  const socialTitle = pageTitle;
 
   // Every page gets the dedicated MASOM social preview image by default so
   // WhatsApp/Facebook/Twitter always have a real branded preview, regardless of
@@ -25,7 +30,10 @@ export function createMetadata({
   const ogImage = image ?? siteConfig.assets.ogImage;
 
   return {
-    title,
+    // Caller-supplied titles flow through the root "%s | MASOM" template;
+    // the site default is already fully branded, so it bypasses the template
+    // via `absolute` (otherwise the homepage would render "... | MASOM | MASOM").
+    title: title ? pageTitle : { absolute: siteConfig.title },
     description,
     alternates: { canonical: path },
     openGraph: {
