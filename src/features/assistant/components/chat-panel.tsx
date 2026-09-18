@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { ASSISTANT_LIMITS, ASSISTANT_MESSAGES, ASSISTANT_SUGGESTIONS } from "../config";
+import { ChatMessageContent } from "./chat-message-content";
 import type { ChatMessage, ChatResponseBody, PaymentCard } from "../types";
 
 /**
@@ -392,7 +393,10 @@ function Bubble({
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
+          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+          // User text stays literal; assistant text uses the safe markdown
+          // renderer which supplies its own paragraph/list structure.
+          isUser && "whitespace-pre-wrap",
           isUser
             ? "rounded-br-sm bg-brand-500 text-white"
             : "rounded-bl-sm bg-brand-100/60 text-ink-800",
@@ -402,7 +406,7 @@ function Bubble({
         {isError ? (
           <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
         ) : null}
-        <span>{children}</span>
+        {isUser || isError ? <span>{children}</span> : <ChatMessageContent content={children} />}
       </div>
     </div>
   );

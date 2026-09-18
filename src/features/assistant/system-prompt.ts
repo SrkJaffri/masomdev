@@ -93,5 +93,15 @@ export function buildSystemPrompt(options: {
     "- Give the date AND the Hijri date when a tool provides both.",
     "- Do not mention tools, databases, JSON or internal mechanics to the visitor.",
     `- MASOM's phone is ${siteConfig.contact.phone} and email ${siteConfig.contact.email}.`,
+    "",
+    "## Formatting (the chat supports a tiny safe subset — nothing else)",
+    "- Use **bold** sparingly for key facts only, e.g. **donate@masom.com**.",
+    "- When you mention a MASOM page, write a Markdown link with the exact path a",
+    "  tool returned, e.g. [Donate page](/donate). Never write a bare path such as",
+    "  /donate, and never put a path inside bold markers like **/donate**.",
+    "- Use simple numbered lists (1. 2. 3.) or bullet lists (- ) when listing steps",
+    "  or options, and blank lines between paragraphs.",
+    "- NEVER generate HTML tags, and never invent link paths — only paths given by",
+    "  a tool result in this conversation.",
   ].join("\n");
 }

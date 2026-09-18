@@ -87,7 +87,7 @@ export const getDonationInfoTool: AssistantTool = {
           "NEVER ask for a card number, CVV, bank account number, routing number, online-banking password or Zelle login.",
           "If a visitor volunteers any of those, tell them not to share it and do not record it.",
           "The assistant can register the donor's information so the committee can follow up — that is NOT a payment.",
-          `Always point the visitor to the Donate page (${siteConfig.links.donate}) alongside the payment methods.`,
+          `Always point the visitor to the Donate page alongside the payment methods: write it as [Donate page](${siteConfig.links.donate}) — a Markdown link with the tool-provided path, never a bare path and never bolded.`,
         ],
       },
     };
@@ -208,10 +208,10 @@ export const registerDonationIntentTool: AssistantTool = {
           instruction:
             "Tell the visitor exactly: 'Your donation information has been registered.' " +
             "Then explain that MASOM has NOT taken any payment, and that they still need " +
-            `to send it themselves via Zelle/Quickpay to ${DONATION_EMAIL} — an approved ` +
+            `to send it themselves via Zelle/Quickpay to **${DONATION_EMAIL}** — an approved ` +
             "Zelle QR is also shown below — or by check to " +
-            `${MAILING_ADDRESS}. Also point them to the Donate page (${siteConfig.links.donate}) ` +
-            "for the full details. Do NOT say 'your donation was received', 'payment " +
+            `${MAILING_ADDRESS}. Also point them to the Donate page as ` +
+            `[Donate page](${siteConfig.links.donate}). Do NOT say 'your donation was received', 'payment ` +
             "successful', 'paid', or anything implying money has changed hands.",
           paymentEmail: DONATION_EMAIL,
           mailingAddress: MAILING_ADDRESS,
