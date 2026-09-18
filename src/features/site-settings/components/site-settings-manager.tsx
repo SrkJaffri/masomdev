@@ -253,6 +253,72 @@ export function SiteSettingsManager({ settings }: { settings: SiteSettingsFormVa
           </ActionSection>
         </section>
 
+        <section aria-labelledby="ai-assistant-heading" className="space-y-4">
+          <div>
+            <h2 id="ai-assistant-heading" className="text-lg font-bold text-foreground">
+              AI Support Agent
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Controls the MASOM Assistant chat widget on public pages. Only the wording
+              is managed here — the AI provider key stays a server environment variable
+              and is never stored in the CMS.
+            </p>
+          </div>
+
+          <ActionSection
+            title="MASOM Assistant"
+            description="Floating chat assistant shown on public pages."
+            enabled={values.ai_assistant_enabled}
+            onEnabledChange={(value) => set("ai_assistant_enabled", value)}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="ai-name">Assistant Name</Label>
+              <Input
+                id="ai-name"
+                name="ai_assistant_name"
+                value={values.ai_assistant_name}
+                onChange={(e) => set("ai_assistant_name", e.target.value)}
+                maxLength={60}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown on the chat button and in the chat header.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ai-welcome">Welcome Message</Label>
+              <Textarea
+                id="ai-welcome"
+                name="ai_assistant_welcome_message"
+                rows={3}
+                value={values.ai_assistant_welcome_message}
+                onChange={(e) => set("ai_assistant_welcome_message", e.target.value)}
+                maxLength={500}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                The first message a visitor sees when the chat opens.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ai-fallback">Fallback Contact Message</Label>
+              <Textarea
+                id="ai-fallback"
+                name="ai_assistant_fallback_message"
+                rows={3}
+                value={values.ai_assistant_fallback_message}
+                onChange={(e) => set("ai_assistant_fallback_message", e.target.value)}
+                maxLength={500}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown when the assistant cannot answer — point visitors to Contact or
+                WhatsApp.
+              </p>
+            </div>
+          </ActionSection>
+        </section>
+
         <div className="flex items-center gap-4">
           <Button type="button" onClick={handleSave} disabled={isPending}>
             {isPending ? (

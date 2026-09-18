@@ -66,6 +66,25 @@ export const siteSettingsSchema = z.object({
     .trim()
     .min(1, "Please enter a hover label.")
     .max(60, "Please keep the hover label under 60 characters."),
+
+  // AI Support Agent. Content only — provider API keys stay in environment
+  // variables and are deliberately NOT editable from the CMS.
+  ai_assistant_enabled: z.boolean(),
+  ai_assistant_name: z
+    .string()
+    .trim()
+    .min(1, "Please enter an assistant name.")
+    .max(60, "Please keep the assistant name under 60 characters."),
+  ai_assistant_welcome_message: z
+    .string()
+    .trim()
+    .min(1, "Please enter a welcome message.")
+    .max(500, "Please keep the welcome message under 500 characters."),
+  ai_assistant_fallback_message: z
+    .string()
+    .trim()
+    .min(1, "Please enter a fallback message.")
+    .max(500, "Please keep the fallback message under 500 characters."),
 });
 
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;

@@ -11,6 +11,14 @@ export type SiteSettingsRow = {
   floating_whatsapp_phone: string;
   floating_whatsapp_message: string;
   floating_whatsapp_label: string;
+  /**
+   * AI Support Agent (MASOM Assistant). Provider API keys are NEVER stored
+   * here — they remain server-side environment variables.
+   */
+  ai_assistant_enabled: boolean;
+  ai_assistant_name: string;
+  ai_assistant_welcome_message: string;
+  ai_assistant_fallback_message: string;
   created_at: string;
   updated_at: string;
 };
@@ -28,6 +36,10 @@ export type PublicSiteSettings = Pick<
   | "floating_whatsapp_phone"
   | "floating_whatsapp_message"
   | "floating_whatsapp_label"
+  | "ai_assistant_enabled"
+  | "ai_assistant_name"
+  | "ai_assistant_welcome_message"
+  | "ai_assistant_fallback_message"
 >;
 
 /** Admin form payload for updateSiteSettings. */

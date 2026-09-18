@@ -18,6 +18,7 @@ export type AdminCounts = {
   calendar: number;
   newsletter: number;
   contact: number;
+  donations: number;
 };
 
 type AdminShellProps = {

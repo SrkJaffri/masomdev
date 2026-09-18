@@ -1,6 +1,7 @@
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WhatsAppFloatingButton } from "@/components/website/whatsapp-floating-button";
 import { SiteHeader } from "@/components/layout/site-header";
+import { AssistantMount } from "@/features/assistant/components/assistant-mount";
 
 export default function WebsiteLayout({
   children,
@@ -15,6 +16,8 @@ export default function WebsiteLayout({
       </main>
       <SiteFooter />
       <WhatsAppFloatingButton />
+      {/* Public pages only — the assistant is never mounted in /admin. */}
+      <AssistantMount />
     </div>
   );
 }

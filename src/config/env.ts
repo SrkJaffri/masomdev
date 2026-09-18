@@ -8,6 +8,15 @@ const DEFAULT_SITE_URL = "https://www.masom.com";
 
 const siteUrlSchema = z.url();
 
+/**
+ * The canonical public host, independent of the runtime environment.
+ *
+ * Use this wherever a URL is written into visitor-facing CONTENT (for example
+ * text the AI assistant produces) rather than into a runtime link: a local dev
+ * run must never put "http://localhost:3000" in front of a visitor.
+ */
+export const CANONICAL_SITE_URL = DEFAULT_SITE_URL;
+
 const supabasePublicSchema = z.object({
   url: z.url(),
   anonKey: z.string().min(1),

@@ -48,7 +48,7 @@ function weekdayOf(iso: string): number {
 }
 
 /** Today's date in MASOM's local timezone (Chicago), as "YYYY-MM-DD". */
-function chicagoTodayISO(): string {
+export function chicagoTodayISO(): string {
   // en-CA formats as YYYY-MM-DD.
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
@@ -98,8 +98,12 @@ function buildSlots(row: CalendarDayRow | undefined): PrayerTimeSlot[] {
  * The final list per day is deduplicated on stable logical identity
  * (anchor + normalized title + category) so a year-specific copy can never
  * double-render alongside its recurring twin.
+ *
+ * Exported so the MASOM Assistant resolves event dates through the SAME
+ * matcher as the public calendar — there is exactly one event-matching
+ * implementation in the codebase.
  */
-function createDayEventResolver(
+export function createDayEventResolver(
   events: CalendarEventRow[],
   months: HijriMonthRow[],
   overrides: HijriOverrideRow[],

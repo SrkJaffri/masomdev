@@ -41,6 +41,10 @@ export async function updateSiteSettings(
     floating_whatsapp_phone: payload.floating_whatsapp_phone,
     floating_whatsapp_message: payload.floating_whatsapp_message,
     floating_whatsapp_label: payload.floating_whatsapp_label,
+    ai_assistant_enabled: payload.ai_assistant_enabled === true,
+    ai_assistant_name: payload.ai_assistant_name,
+    ai_assistant_welcome_message: payload.ai_assistant_welcome_message,
+    ai_assistant_fallback_message: payload.ai_assistant_fallback_message,
   });
 
   if (!parsed.success) {
@@ -72,6 +76,11 @@ export async function updateSiteSettings(
         floating_whatsapp_phone: values.floating_whatsapp_phone,
         floating_whatsapp_message: values.floating_whatsapp_message,
         floating_whatsapp_label: values.floating_whatsapp_label,
+        // Content only — the AI provider key is never stored in the CMS.
+        ai_assistant_enabled: values.ai_assistant_enabled,
+        ai_assistant_name: values.ai_assistant_name,
+        ai_assistant_welcome_message: values.ai_assistant_welcome_message,
+        ai_assistant_fallback_message: values.ai_assistant_fallback_message,
       })
       .eq("id", "main")
       .select("updated_at")
@@ -98,6 +107,10 @@ export async function updateSiteSettings(
       floating_whatsapp_phone: values.floating_whatsapp_phone,
       floating_whatsapp_message: values.floating_whatsapp_message,
       floating_whatsapp_label: values.floating_whatsapp_label,
+      ai_assistant_enabled: values.ai_assistant_enabled,
+      ai_assistant_name: values.ai_assistant_name,
+      ai_assistant_welcome_message: values.ai_assistant_welcome_message,
+      ai_assistant_fallback_message: values.ai_assistant_fallback_message,
       // Confirmed by the DB trigger — the row-version marker for the client.
       updated_at: (data as { updated_at: string }).updated_at,
     };

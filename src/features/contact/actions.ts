@@ -1,11 +1,10 @@
 "use server";
 
-import { createHash } from "node:crypto";
-
 import { headers } from "next/headers";
 
 import { getContactEmailConfig } from "@/config/env";
 import { logCmsError } from "@/lib/cms/logging";
+import { hashIp, resolveClientIp } from "@/lib/http/client-identity";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -168,43 +167,6 @@ export async function submitContactForm(
 export async function refreshCaptchaChallenge(): Promise<string> {
   const { question } = await createCaptchaChallenge();
   return question;
-}
-
-// ---------------------------------------------------------------------------
-// Client IP resolution — trusted-header strategy (first value wins).
-// ---------------------------------------------------------------------------
-async function resolveClientIp(): Promise<string> {
-  const headersList = await headers();
-
-  // Cloudflare (the edge this site is served through) provides the original
-  // visitor address directly; it cannot be spoofed past Cloudflare itself.
-  const cfIp = headersList.get("cf-connecting-ip")?.trim();
-  if (cfIp) return cfIp;
-
-  // Standard proxy chain — take the FIRST (leftmost = original client) entry.
-  const forwarded = headersList.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded) return forwarded;
-
-  const realIp = headersList.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
-  // Local development usually has no proxy headers at all. All local requests
-  // would collapse onto one bucket and repeatedly trip the 20 s production
-  // cooldown, so dev gets a stable, clearly-marked local key (the limiter is
-  // constructed with a short 2 s window in dev). Production behavior is
-  // unchanged: full 20 s per real client IP.
-  if (process.env.NODE_ENV === "development") return "local-dev";
-
-  return "unknown";
-}
-
-/** One-way hash of the client IP — abuse correlation without storing the raw
- * address. Salted with the service-role key so the hash is not reversible via
- * rainbow tables; the salt never leaves the server. */
-function hashIp(ip: string): string | null {
-  if (ip === "unknown") return null;
-  const salt = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }
 
 // ---------------------------------------------------------------------------

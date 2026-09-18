@@ -16,7 +16,8 @@
     "format:check": "prettier --check .",
     "seed:cms": "node --env-file=.env.local scripts/seed-cms.mjs",
     "seed:calendar": "node --env-file=.env.local scripts/seed-calendar.mjs",
-    "convert:logos": "node scripts/convert-logos.mjs"
+    "convert:logos": "node scripts/convert-logos.mjs",
+    "ai:test": "node --env-file=.env.local scripts/ai-capability-test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.7.1",

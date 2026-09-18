@@ -2,6 +2,7 @@ import {
   ActivityIcon,
   CalendarDaysIcon,
   CalendarIcon,
+  HeartHandshakeIcon,
   ImageIcon,
   MailIcon,
   MegaphoneIcon,
@@ -36,6 +37,7 @@ const MODULE_META: Record<
   newsletter: { label: "Newsletter", icon: MailIcon },
   contact: { label: "Contact message", icon: MessageSquareIcon },
   settings: { label: "Site settings", icon: SettingsIcon },
+  donation: { label: "Donation entry", icon: HeartHandshakeIcon },
 };
 
 function actionMeta(action: string): {

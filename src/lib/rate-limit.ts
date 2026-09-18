@@ -49,3 +49,51 @@ export function createRateLimiter(
     },
   };
 }
+
+/**
+ * Counting limiter for conversational endpoints (the assistant chat), where a
+ * single fixed cooldown is the wrong shape: a visitor legitimately sends
+ * several messages in a row, but an abusive client must not be able to burn
+ * AI tokens without bound.
+ *
+ * `take(key)` records one hit and reports whether the caller is over budget,
+ * so the check and the accounting cannot drift apart.
+ */
+export type BurstLimiter = {
+  take: (key: string, now?: number) => { allowed: boolean; retryAfterMs: number };
+};
+
+export function createBurstLimiter(
+  /** Namespace label, e.g. "assistant" — keeps buckets isolated per feature. */
+  namespace: string,
+  limit: number,
+  windowMs: number,
+): BurstLimiter {
+  const hits = new Map<string, number[]>();
+
+  function sweep(now: number) {
+    if (hits.size <= MAX_IP_ENTRIES) return;
+    for (const [key, stamps] of hits) {
+      if (stamps.every((at) => now - at >= windowMs)) hits.delete(key);
+    }
+  }
+
+  return {
+    take(key, now = Date.now()) {
+      const bucketKey = `${namespace}:${key}`;
+      sweep(now);
+
+      const recent = (hits.get(bucketKey) ?? []).filter((at) => now - at < windowMs);
+
+      if (recent.length >= limit) {
+        hits.set(bucketKey, recent);
+        // Oldest hit in the window decides when a slot frees up.
+        return { allowed: false, retryAfterMs: windowMs - (now - recent[0]) };
+      }
+
+      recent.push(now);
+      hits.set(bucketKey, recent);
+      return { allowed: true, retryAfterMs: 0 };
+    },
+  };
+}

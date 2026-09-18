@@ -3,6 +3,7 @@
 import {
   CalendarIcon,
   CalendarDaysIcon,
+  HeartHandshakeIcon,
   ImageIcon,
   LayoutDashboardIcon,
   Loader2Icon,
@@ -71,6 +72,7 @@ function buildSections(): NavSection[] {
         { href: "/admin/calendar", label: "Calendar", icon: CalendarIcon, accent: "amber", countKey: "calendar" },
         { href: "/admin/newsletter", label: "Newsletter", icon: MailIcon, accent: "teal", countKey: "newsletter" },
         { href: "/admin/contact-messages", label: "Contact Messages", icon: MessageSquareIcon, accent: "blue", countKey: "contact" },
+        { href: "/admin/donation-intents", label: "Donation Entries", icon: HeartHandshakeIcon, accent: "amber", countKey: "donations" },
       ],
     },
     {

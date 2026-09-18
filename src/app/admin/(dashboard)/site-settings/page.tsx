@@ -28,6 +28,10 @@ export default async function AdminSiteSettingsPage() {
         floating_whatsapp_phone: settings.floating_whatsapp_phone,
         floating_whatsapp_message: settings.floating_whatsapp_message,
         floating_whatsapp_label: settings.floating_whatsapp_label,
+        ai_assistant_enabled: settings.ai_assistant_enabled,
+        ai_assistant_name: settings.ai_assistant_name,
+        ai_assistant_welcome_message: settings.ai_assistant_welcome_message,
+        ai_assistant_fallback_message: settings.ai_assistant_fallback_message,
         // Row-version marker so the form adopts only genuinely newer props.
         updated_at: settings.updated_at,
       }}
