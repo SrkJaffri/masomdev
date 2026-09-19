@@ -9,6 +9,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const CMS_BUCKETS = {
   banners: "banners",
   programs: "programs",
+  /** Dedicated Website Popup artwork bucket (public read, admin-only write). */
+  popup: "popup",
 } as const;
 
 export type CmsBucket = (typeof CMS_BUCKETS)[keyof typeof CMS_BUCKETS];

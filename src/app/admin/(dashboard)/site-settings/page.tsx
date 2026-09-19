@@ -3,6 +3,7 @@ import {
   getSiteSettingsRow,
   SITE_SETTINGS_FALLBACK,
 } from "@/features/site-settings/queries";
+import { resolveImageSrc } from "@/lib/media/storage";
 
 export default async function AdminSiteSettingsPage() {
   const row = await getSiteSettingsRow();
@@ -32,6 +33,18 @@ export default async function AdminSiteSettingsPage() {
         ai_assistant_name: settings.ai_assistant_name,
         ai_assistant_welcome_message: settings.ai_assistant_welcome_message,
         ai_assistant_fallback_message: settings.ai_assistant_fallback_message,
+        popup_enabled: settings.popup_enabled,
+        popup_image_url: settings.popup_image_url,
+        // Resolved to a renderable URL (public bucket URL for storage paths)
+        // server-side; the form only ever sees a previewable src.
+        popup_image_preview: resolveImageSrc(
+          "popup",
+          settings.popup_image_url || null,
+        ),
+        popup_delay_seconds: settings.popup_delay_seconds,
+        popup_display_pages: settings.popup_display_pages,
+        popup_frequency: settings.popup_frequency,
+        popup_link_url: settings.popup_link_url,
         // Row-version marker so the form adopts only genuinely newer props.
         updated_at: settings.updated_at,
       }}

@@ -1,8 +1,14 @@
 "use client";
 
-import { SaveIcon } from "lucide-react";
+import { SaveIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState, useTransition } from "react";
+import Image from "next/image";
+import {
+  useCallback,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
@@ -10,8 +16,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { updateSiteSettings } from "@/features/site-settings/actions";
-import type { SiteSettingsFormValues } from "@/features/site-settings/types";
+import {
+  removePopupImage,
+  updateSiteSettings,
+  uploadPopupImage,
+} from "@/features/site-settings/actions";
+import { POPUP_PAGE_OPTIONS } from "@/features/site-settings/popup-pages";
+import type {
+  PopupFrequency,
+  SiteSettingsFormValues,
+} from "@/features/site-settings/types";
+import { cn } from "@/lib/utils";
 import { Loader2Icon } from "lucide-react";
 
 /** One Homepage Actions subsection: toggle + fields. */
@@ -64,6 +79,330 @@ type SaveUiState = { status: "idle" | "success" | "error"; message: string | nul
 
 const IDLE_SAVE_STATE: SaveUiState = { status: "idle", message: null };
 
+const DELAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+
+/**
+ * Website Popup section: image, delay, target pages, frequency and optional
+ * click-through. Image upload/remove are their own server actions so the
+ * artwork persists immediately (independent of Save Settings), mirroring how
+ * banners/programs manage media.
+ */
+function PopupSection({
+  values,
+  set,
+  onSyncFromServer,
+}: {
+  values: SiteSettingsFormValues;
+  set: <K extends keyof SiteSettingsFormValues>(
+    key: K,
+    value: SiteSettingsFormValues[K],
+  ) => void;
+  onSyncFromServer: (values: SiteSettingsFormValues) => void;
+}) {
+  const router = useRouter();
+  const [imageState, setImageState] = useState<SaveUiState>(IDLE_SAVE_STATE);
+  const [isUploading, startUploadTransition] = useTransition();
+  const [isRemoving, startRemoveTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const pages = values.popup_display_pages;
+  const allSelected = pages.length === POPUP_PAGE_OPTIONS.length;
+
+  const togglePage = (path: string, checked: boolean) => {
+    const next = checked ? [...pages, path] : pages.filter((p) => p !== path);
+    set("popup_display_pages", next);
+  };
+
+  const handleUpload = useCallback(
+    (file: File) => {
+      setImageState(IDLE_SAVE_STATE);
+      const formData = new FormData();
+      formData.append("image", file);
+      startUploadTransition(async () => {
+        const result = await uploadPopupImage(formData);
+        if (result.status === "success") {
+          // Adopt the DB-confirmed state into the form so a subsequent Save
+          // Settings persists the same image (never an older local value).
+          onSyncFromServer({
+            ...values,
+            popup_image_url: result.path,
+            popup_image_preview: result.previewUrl,
+          });
+          setImageState({ status: "success", message: result.message });
+          router.refresh();
+        } else {
+          setImageState({ status: "error", message: result.message });
+        }
+        // Allow selecting the same file again after a reset.
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      });
+    },
+    [values, onSyncFromServer, router],
+  );
+
+  const handleRemove = useCallback(() => {
+    setImageState(IDLE_SAVE_STATE);
+    startRemoveTransition(async () => {
+      const result = await removePopupImage();
+      if (result.status === "success") {
+        onSyncFromServer({
+          ...values,
+          popup_image_url: "",
+          popup_image_preview: null,
+        });
+        setImageState({ status: "success", message: result.message });
+        router.refresh();
+      } else {
+        setImageState({ status: "error", message: result.message });
+      }
+    });
+  }, [values, onSyncFromServer, router]);
+
+  return (
+    <section aria-labelledby="website-popup-heading" className="space-y-4">
+      <div>
+        <h2 id="website-popup-heading" className="text-lg font-bold text-foreground">
+          Website Popup
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Promotional image popup shown automatically on selected public pages.
+        </p>
+      </div>
+
+      <section className="rounded-2xl border border-border/60 bg-card p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-bold text-foreground">Enable Website Popup</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Master toggle — nothing renders on the public site while disabled.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm font-medium text-muted-foreground">
+              {values.popup_enabled ? "Enabled" : "Disabled"}
+            </span>
+            <Switch
+              checked={values.popup_enabled}
+              onCheckedChange={(value) => set("popup_enabled", value)}
+              aria-label="Toggle website popup"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section
+        className={cn(
+          "rounded-2xl border border-border/60 bg-card p-6",
+          !values.popup_enabled && "opacity-50 transition-opacity",
+        )}
+      >
+        <div
+          className={cn("grid gap-6", !values.popup_enabled && "pointer-events-none")}
+          aria-disabled={!values.popup_enabled}
+        >
+          {/* Image */}
+          <div className="space-y-2">
+            <Label>Popup Image</Label>
+            {values.popup_image_preview ? (
+              <div className="relative w-fit">
+                <div className="relative size-40 overflow-hidden rounded-xl border border-border bg-muted">
+                  <Image
+                    src={values.popup_image_preview}
+                    alt="Popup image preview"
+                    fill
+                    sizes="160px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex size-40 items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 text-center">
+                <p className="px-3 text-xs text-muted-foreground">No image configured</p>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={fileInputRef}
+                id="popup-image"
+                name="popup-image"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                aria-label="Upload popup image"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) handleUpload(file);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUploading || isRemoving}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+                    Uploading…
+                  </>
+                ) : (
+                  <>
+                    <UploadIcon className="size-4" aria-hidden="true" />
+                    {values.popup_image_preview ? "Replace Image" : "Upload Image"}
+                  </>
+                )}
+              </Button>
+              {values.popup_image_preview ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={isUploading || isRemoving}
+                  onClick={handleRemove}
+                >
+                  {isRemoving ? (
+                    <>
+                      <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
+                      Removing…
+                    </>
+                  ) : (
+                    <>
+                      <Trash2Icon className="size-4" aria-hidden="true" />
+                      Remove Image
+                    </>
+                  )}
+                </Button>
+              ) : null}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              JPEG, PNG or WebP · up to 5 MB. Recommended: 1:1 square artwork,
+              650 × 650 px — the artwork contains its own message, so no extra
+              text is added around it.
+            </p>
+            {imageState.status === "success" && imageState.message ? (
+              <p role="status" className="text-sm font-medium text-brand-700 dark:text-brand-300">
+                {imageState.message}
+              </p>
+            ) : null}
+            {imageState.status === "error" && imageState.message ? (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {imageState.message}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Delay */}
+          <div className="space-y-2">
+            <Label htmlFor="popup-delay">Display Delay</Label>
+            <select
+              id="popup-delay"
+              value={values.popup_delay_seconds}
+              onChange={(event) =>
+                set("popup_delay_seconds", Number(event.target.value))
+              }
+              disabled={!values.popup_enabled}
+              className="w-48 cursor-pointer appearance-none rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground shadow-card transition-colors hover:border-brand-400 focus:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            >
+              {DELAY_OPTIONS.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds} second{seconds === 1 ? "" : "s"} after page load
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              How long to wait after the page loads before the popup opens.
+            </p>
+          </div>
+
+          {/* Pages */}
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium text-foreground">Display Pages</legend>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {POPUP_PAGE_OPTIONS.map((option) => {
+                const checked = pages.includes(option.path);
+                return (
+                  <label
+                    key={option.path}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm transition-colors hover:border-brand-400"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(event) => togglePage(option.path, event.target.checked)}
+                      className="size-4 accent-brand-500"
+                    />
+                    <span className="font-medium text-foreground">{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => set("popup_display_pages", POPUP_PAGE_OPTIONS.map((o) => o.path))}
+                disabled={allSelected}
+              >
+                Select All
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => set("popup_display_pages", [])}
+                disabled={pages.length === 0}
+              >
+                Clear All
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {pages.length} of {POPUP_PAGE_OPTIONS.length} pages selected
+              </span>
+            </div>
+          </fieldset>
+
+          {/* Frequency */}
+          <div className="space-y-2">
+            <Label htmlFor="popup-frequency">Display Frequency</Label>
+            <select
+              id="popup-frequency"
+              value={values.popup_frequency}
+              onChange={(event) =>
+                set("popup_frequency", event.target.value as PopupFrequency)
+              }
+              disabled={!values.popup_enabled}
+              className="w-72 cursor-pointer appearance-none rounded-xl border border-border bg-card px-3.5 py-2 text-sm font-semibold text-foreground shadow-card transition-colors hover:border-brand-400 focus:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            >
+              <option value="session">Once per browser session</option>
+              <option value="always">Every page load</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              “Once per session” remembers the visitor in this browser tab session only —
+              updating the popup config or image makes it eligible again.
+            </p>
+          </div>
+
+          {/* Click-through */}
+          <div className="space-y-2">
+            <Label htmlFor="popup-link">Click-through URL (optional)</Label>
+            <Input
+              id="popup-link"
+              value={values.popup_link_url}
+              onChange={(event) => set("popup_link_url", event.target.value)}
+              placeholder="/donate or https://…"
+              inputMode="url"
+              disabled={!values.popup_enabled}
+            />
+            <p className="text-xs text-muted-foreground">
+              Internal route (e.g. /donate) or approved https:// URL. Leave blank
+              for a non-clickable image.
+            </p>
+          </div>
+        </div>
+      </section>
+    </section>
+  );
+}
+
 export function SiteSettingsManager({ settings }: { settings: SiteSettingsFormValues }) {
   const router = useRouter();
 
@@ -83,6 +422,17 @@ export function SiteSettingsManager({ settings }: { settings: SiteSettingsFormVa
   const set = useCallback(
     <K extends keyof SiteSettingsFormValues>(key: K, value: SiteSettingsFormValues[K]) =>
       setValues((prev) => ({ ...prev, [key]: value })),
+    [],
+  );
+
+  // Popup image upload/remove actions persist immediately; this folds their
+  // DB-confirmed values into the form so a subsequent Save Settings submits
+  // the same state (never a stale local value).
+  const syncPopupFromServer = useCallback(
+    (serverValues: SiteSettingsFormValues) => {
+      latestServerVersionRef.current = serverValues.updated_at;
+      setValues((prev) => ({ ...prev, ...serverValues }));
+    },
     [],
   );
 
@@ -318,6 +668,12 @@ export function SiteSettingsManager({ settings }: { settings: SiteSettingsFormVa
             </div>
           </ActionSection>
         </section>
+
+        <PopupSection
+          values={values}
+          set={set}
+          onSyncFromServer={syncPopupFromServer}
+        />
 
         <div className="flex items-center gap-4">
           <Button type="button" onClick={handleSave} disabled={isPending}>

@@ -30,6 +30,17 @@ export const SITE_SETTINGS_FALLBACK: PublicSiteSettings = {
   ai_assistant_name: ASSISTANT_DEFAULTS.name,
   ai_assistant_welcome_message: ASSISTANT_DEFAULTS.welcomeMessage,
   ai_assistant_fallback_message: ASSISTANT_DEFAULTS.fallbackMessage,
+  // Popup defaults mirror the migration: OFF until the admin explicitly
+  // enables it, so nothing new appears on the public site after deploy. The
+  // image default points at the approved 650×650 artwork in /public.
+  popup_enabled: false,
+  popup_image_url: "/popup.webp",
+  popup_delay_seconds: 3,
+  popup_display_pages: ["/"],
+  popup_frequency: "session",
+  popup_link_url: "",
+  // Empty version: session-scoped features treat it as "never configured".
+  updated_at: "",
 };
 
 /**
@@ -70,6 +81,20 @@ export const getPublicSiteSettings = cache(async (): Promise<PublicSiteSettings>
       ai_assistant_fallback_message:
         row.ai_assistant_fallback_message ??
         SITE_SETTINGS_FALLBACK.ai_assistant_fallback_message,
+      // Popup columns may not exist yet (migration pending) — fall back per
+      // column so a pending migration can never break the whole settings read.
+      popup_enabled: row.popup_enabled ?? SITE_SETTINGS_FALLBACK.popup_enabled,
+      popup_image_url: row.popup_image_url ?? SITE_SETTINGS_FALLBACK.popup_image_url,
+      popup_delay_seconds:
+        row.popup_delay_seconds ?? SITE_SETTINGS_FALLBACK.popup_delay_seconds,
+      popup_display_pages:
+        row.popup_display_pages ?? SITE_SETTINGS_FALLBACK.popup_display_pages,
+      popup_frequency:
+        row.popup_frequency === "always"
+          ? "always"
+          : (row.popup_frequency as PublicSiteSettings["popup_frequency"]) ??
+            SITE_SETTINGS_FALLBACK.popup_frequency,
+      popup_link_url: row.popup_link_url ?? SITE_SETTINGS_FALLBACK.popup_link_url,
     };
   } catch (error) {
     logCmsError("site-settings:getPublic", error);
@@ -108,6 +133,15 @@ export async function getSiteSettingsRow(): Promise<SiteSettingsRow | null> {
     ai_assistant_fallback_message:
       row.ai_assistant_fallback_message ??
       SITE_SETTINGS_FALLBACK.ai_assistant_fallback_message,
+    popup_enabled: row.popup_enabled ?? SITE_SETTINGS_FALLBACK.popup_enabled,
+    popup_image_url: row.popup_image_url ?? SITE_SETTINGS_FALLBACK.popup_image_url,
+    popup_delay_seconds:
+      row.popup_delay_seconds ?? SITE_SETTINGS_FALLBACK.popup_delay_seconds,
+    popup_display_pages:
+      row.popup_display_pages ?? SITE_SETTINGS_FALLBACK.popup_display_pages,
+    popup_frequency:
+      row.popup_frequency === "always" ? "always" : (row.popup_frequency as SiteSettingsRow["popup_frequency"]) ?? SITE_SETTINGS_FALLBACK.popup_frequency,
+    popup_link_url: row.popup_link_url ?? SITE_SETTINGS_FALLBACK.popup_link_url,
     id: row.id ?? "main",
     created_at: row.created_at ?? "",
     updated_at: row.updated_at ?? "",
