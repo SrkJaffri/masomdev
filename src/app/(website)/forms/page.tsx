@@ -22,22 +22,22 @@ type FormDocument = {
   applyUrl?: string;
 };
 
-/** Source: masom.com/forms — actual live PDF URLs (wp-content uploads). */
+/** PDFs served locally from /public/pdf (also linked from masom.com uploads). */
 const documents: FormDocument[] = [
   {
     title: "Membership Guidelines",
     description: "Membership guidelines and information",
-    url: "https://masom.com/wp-content/uploads/2020/07/MASOM_Membership_Guidelines_2019.pdf",
+    url: "/pdf/MASOM_Membership_Guidelines_2019.pdf",
   },
   {
     title: "Membership Form",
     description: "Official MASOM membership form",
-    url: "https://masom.com/wp-content/uploads/2020/07/MASOM_Membership_Form_and_Release_2020.pdf",
+    url: "/pdf/MASOM_Membership_Form_and_Release_2020.pdf",
   },
   {
     title: "Private Program",
     description: "Private program application form",
-    url: "https://masom.com/wp-content/uploads/2020/07/privateProgram.pdf",
+    url: "/pdf/privateProgram.pdf",
     applyUrl: "/private-program-application",
   },
 ];
