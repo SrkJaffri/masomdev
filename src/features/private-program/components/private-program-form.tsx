@@ -17,7 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-import { refreshPrivateProgramCaptcha, submitPrivateProgramApplication } from "../actions";
+import {
+  refreshPrivateProgramCaptcha,
+  submitPrivateProgramApplication,
+} from "../actions";
 import {
   ADVERTISEMENT_OPTIONS,
   AGREEMENT_TEXT,
@@ -92,34 +95,66 @@ function emptyValues(agreementDate: string): FormValues {
 // Presentational helpers
 // ---------------------------------------------------------------------------
 
+// Keep these surfaces local to this form; shared controls and other pages stay unchanged.
+const sectionCardClass =
+  "relative isolate overflow-hidden rounded-[20px] border bg-white p-5 shadow-card sm:p-8";
+
+const sectionSurfaceClasses = {
+  1: "border-brand-500/25 bg-linear-to-br from-brand-500/10 via-white to-brand-50/95",
+  2: "border-brand-400/25 bg-linear-to-tr from-brand-400/8 via-brand-50/60 to-white",
+  3: "border-brand-500/20 bg-linear-to-br from-brand-500/8 via-white to-sand-400/8",
+  4: "border-sand-400/35 bg-linear-to-br from-sand-400/12 via-[#fffdf8] to-brand-50/55",
+  5: "border-brand-500/25 bg-linear-to-br from-brand-500/9 via-white to-sand-400/7",
+};
+
+const sectionGlowClasses = {
+  1: "bg-brand-400/10",
+  2: "bg-brand-200/25",
+  3: "bg-sand-300/20",
+  4: "bg-sand-300/25",
+  5: "bg-brand-400/8",
+};
+
+const sectionBadgeClass =
+  "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-brand-100 via-brand-200/70 to-white font-heading text-base font-bold text-[color-mix(in_oklab,var(--color-brand-700)_80%,var(--color-ink-900))] ring-1 ring-brand-500/25 shadow-[inset_0_1px_2px_rgb(255_255_255/0.9)]";
+
 function FormSection({
   step,
   title,
   description,
   children,
 }: {
-  step: number;
+  step: keyof typeof sectionSurfaceClasses;
   title: string;
   description?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-card sm:p-8">
-      <div className="flex items-start gap-4">
-        <span
-          aria-hidden="true"
-          className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 font-heading text-sm font-bold text-brand-600"
-        >
+    <section className={`${sectionCardClass} ${sectionSurfaceClasses[step]}`}>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-linear-to-r from-brand-500/65 via-brand-200/60 to-sand-300/20"
+      />
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute -top-20 -right-20 size-52 rounded-full blur-3xl ${sectionGlowClasses[step]}`}
+      />
+      <div className="relative flex items-start gap-3.5 sm:gap-4">
+        <span aria-hidden="true" className={sectionBadgeClass}>
           {step}
         </span>
         <div className="min-w-0">
-          <h2 className="font-heading text-xl leading-snug font-bold text-foreground">{title}</h2>
+          <h2 className="font-heading text-xl leading-snug font-bold tracking-tight text-ink-900">
+            {title}
+          </h2>
           {description ? (
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{description}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-[color-mix(in_oklab,var(--color-ink-500)_85%,var(--color-brand-700))]">
+              {description}
+            </p>
           ) : null}
         </div>
       </div>
-      <div className="mt-7">{children}</div>
+      <div className="relative mt-6 sm:mt-7">{children}</div>
     </section>
   );
 }
@@ -142,9 +177,14 @@ function RequiredMark() {
   );
 }
 
+/** White fields stay distinct from the tinted section surfaces. */
+const controlSurfaceClass =
+  "border-[color-mix(in_oklab,var(--color-brand-700)_20%,var(--color-border))] bg-white shadow-xs focus-visible:border-brand-700 focus-visible:ring-brand-500/20";
+const inputClass = `h-11 rounded-xl px-4 ${controlSurfaceClass}`;
+
 /** Shared choice-card chrome for the radio and checkbox controls. */
 const choiceCardClass =
-  "group flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-background px-4 py-3.5 text-sm transition-all hover:border-brand-500/50 hover:bg-brand-500/5 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-500/10 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50";
+  "group flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border border-brand-700/20 bg-white/85 px-3.5 py-3 text-sm transition-colors hover:border-brand-500/50 hover:bg-brand-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-100/80 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-brand-500/25";
 
 // ---------------------------------------------------------------------------
 
@@ -300,9 +340,9 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
           Application Submitted
         </h2>
         <p className="mt-3 max-w-lg text-base leading-relaxed text-muted-foreground">
-          Thank you. Your Private Program Application has been sent to MASOM. Submission of
-          this application does not constitute final approval. A MASOM representative will
-          contact you after review.
+          Thank you. Your Private Program Application has been sent to MASOM. Submission
+          of this application does not constitute final approval. A MASOM representative
+          will contact you after review.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
           <Button asChild variant="cta" size="pill" className="h-11 rounded-xl px-7">
@@ -327,7 +367,11 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+        className="space-y-6 sm:space-y-7"
+      >
         {errorMessage ? (
           <p
             role="alert"
@@ -355,7 +399,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                   <input
                     type="radio"
                     value={option.value}
-                    className="mt-0.5 size-4 shrink-0 accent-brand-500"
+                    className="mt-0.5 size-4 shrink-0 accent-brand-700"
                     {...register("recurrence")}
                   />
                   <span className="font-medium text-foreground">{option.label}</span>
@@ -377,12 +421,17 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 id="pp-other-schedule"
                 type="text"
                 placeholder="Describe the schedule"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.otherSchedule ? true : undefined}
-                aria-describedby={errors.otherSchedule ? "pp-other-schedule-error" : undefined}
+                aria-describedby={
+                  errors.otherSchedule ? "pp-other-schedule-error" : undefined
+                }
                 {...register("otherSchedule")}
               />
-              <FieldError id="pp-other-schedule-error" message={errors.otherSchedule?.message} />
+              <FieldError
+                id="pp-other-schedule-error"
+                message={errors.otherSchedule?.message}
+              />
             </div>
           ) : null}
 
@@ -395,7 +444,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
               <Input
                 id="pp-start-date"
                 type="date"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.startDate ? true : undefined}
                 aria-describedby={errors.startDate ? "pp-start-date-error" : undefined}
                 {...register("startDate", {
@@ -421,7 +470,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 id="pp-end-date"
                 type="date"
                 min={startDate || undefined}
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.endDate ? true : undefined}
                 aria-describedby={errors.endDate ? "pp-end-date-error" : undefined}
                 {...register("endDate")}
@@ -450,7 +499,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 id="pp-title"
                 type="text"
                 placeholder="e.g. Majlis-e-Aza"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.programTitle ? true : undefined}
                 aria-describedby={errors.programTitle ? "pp-title-error" : undefined}
                 {...register("programTitle")}
@@ -469,19 +518,24 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                   <Input
                     id="pp-start-time"
                     type="time"
-                    className="h-11 rounded-xl px-4"
+                    className={inputClass}
                     aria-invalid={errors.startTime ? true : undefined}
-                    aria-describedby={errors.startTime ? "pp-start-time-error" : undefined}
+                    aria-describedby={
+                      errors.startTime ? "pp-start-time-error" : undefined
+                    }
                     {...register("startTime")}
                   />
-                  <FieldError id="pp-start-time-error" message={errors.startTime?.message} />
+                  <FieldError
+                    id="pp-start-time-error"
+                    message={errors.startTime?.message}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pp-end-time">End Time</Label>
                   <Input
                     id="pp-end-time"
                     type="time"
-                    className="h-11 rounded-xl px-4"
+                    className={inputClass}
                     aria-invalid={errors.endTime ? true : undefined}
                     aria-describedby={errors.endTime ? "pp-end-time-error" : undefined}
                     {...register("endTime")}
@@ -501,16 +555,21 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 rows={5}
                 maxLength={SUMMARY_MAX_LENGTH}
                 placeholder="Briefly describe the purpose and format of the program…"
-                className="min-h-32 rounded-xl px-4 py-3"
+                className={`min-h-32 rounded-xl px-4 py-3 ${controlSurfaceClass}`}
                 aria-invalid={errors.summary ? true : undefined}
                 aria-describedby={
-                  errors.summary ? "pp-summary-error pp-summary-count" : "pp-summary-count"
+                  errors.summary
+                    ? "pp-summary-error pp-summary-count"
+                    : "pp-summary-count"
                 }
                 {...register("summary")}
               />
               <div className="flex items-start justify-between gap-4">
                 <FieldError id="pp-summary-error" message={errors.summary?.message} />
-                <p id="pp-summary-count" className="ml-auto shrink-0 text-xs text-muted-foreground">
+                <p
+                  id="pp-summary-count"
+                  className="ml-auto shrink-0 text-xs text-muted-foreground"
+                >
                   {(summary ?? "").length} / {SUMMARY_MAX_LENGTH}
                 </p>
               </div>
@@ -523,7 +582,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                   id="pp-speaker"
                   type="text"
                   placeholder="Name of the speaker (if known)"
-                  className="h-11 rounded-xl px-4"
+                  className={inputClass}
                   aria-invalid={errors.speaker ? true : undefined}
                   aria-describedby={errors.speaker ? "pp-speaker-error" : undefined}
                   {...register("speaker")}
@@ -539,7 +598,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                   min={1}
                   step={1}
                   placeholder="e.g. 120"
-                  className="h-11 rounded-xl px-4"
+                  className={inputClass}
                   aria-invalid={errors.attendees ? true : undefined}
                   aria-describedby={errors.attendees ? "pp-attendees-error" : undefined}
                   {...register("attendees")}
@@ -574,7 +633,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                     <input
                       type="checkbox"
                       value={option.value}
-                      className="mt-0.5 size-4 shrink-0 rounded accent-brand-500"
+                      className="mt-0.5 size-4 shrink-0 rounded accent-brand-700"
                       aria-invalid={errors.congregationAreas ? true : undefined}
                       {...register("congregationAreas")}
                     />
@@ -595,14 +654,16 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 <legend className="text-sm font-semibold text-foreground">
                   Taburruk / Food Service
                 </legend>
-                <p className="mt-1 text-xs text-muted-foreground">Select all that apply</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Select all that apply
+                </p>
                 <div className="mt-3 space-y-2.5">
                   {FOOD_SERVICE_OPTIONS.map((option) => (
                     <label key={option.value} className={choiceCardClass}>
                       <input
                         type="checkbox"
                         value={option.value}
-                        className="mt-0.5 size-4 shrink-0 rounded accent-brand-500"
+                        className="mt-0.5 size-4 shrink-0 rounded accent-brand-700"
                         {...register("foodService")}
                       />
                       <span className="font-medium text-foreground">{option.label}</span>
@@ -615,14 +676,16 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 <legend className="text-sm font-semibold text-foreground">
                   Logistical Components
                 </legend>
-                <p className="mt-1 text-xs text-muted-foreground">Select all that apply</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Select all that apply
+                </p>
                 <div className="mt-3 space-y-2.5">
                   {LOGISTICS_OPTIONS.map((option) => (
                     <label key={option.value} className={choiceCardClass}>
                       <input
                         type="checkbox"
                         value={option.value}
-                        className="mt-0.5 size-4 shrink-0 rounded accent-brand-500"
+                        className="mt-0.5 size-4 shrink-0 rounded accent-brand-700"
                         {...register("logistics")}
                       />
                       <span className="font-medium text-foreground">{option.label}</span>
@@ -632,14 +695,16 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
               </fieldset>
 
               <fieldset>
-                <legend className="text-sm font-semibold text-foreground">Advertisement</legend>
+                <legend className="text-sm font-semibold text-foreground">
+                  Advertisement
+                </legend>
                 <div className="mt-3 space-y-2.5">
                   {ADVERTISEMENT_OPTIONS.map((option) => (
                     <label key={option.value} className={choiceCardClass}>
                       <input
                         type="checkbox"
                         value={option.value}
-                        className="mt-0.5 size-4 shrink-0 rounded accent-brand-500"
+                        className="mt-0.5 size-4 shrink-0 rounded accent-brand-700"
                         {...register("advertisement")}
                       />
                       <span className="font-medium text-foreground">{option.label}</span>
@@ -657,16 +722,19 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
           title="MASOM Guidelines"
           description="Please review before submitting. These apply to every private program held at MASOM."
         >
-          <ol className="space-y-4">
+          <ol className="divide-y divide-sand-400/20">
             {MASOM_GUIDELINES.map((guideline, index) => (
-              <li key={guideline} className="flex gap-4">
+              <li
+                key={guideline}
+                className="flex gap-3 py-3.5 first:pt-0 last:pb-0 sm:gap-4"
+              >
                 <span
                   aria-hidden="true"
-                  className="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-sand-100 font-heading text-xs font-bold text-ink-800"
+                  className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-sand-100 to-sand-300/60 font-heading text-xs font-bold text-ink-600 ring-1 ring-sand-400/30"
                 >
                   {index + 1}
                 </span>
-                <p className="text-sm leading-relaxed text-muted-foreground">{guideline}</p>
+                <p className="min-w-0 text-sm leading-7 text-ink-500">{guideline}</p>
               </li>
             ))}
           </ol>
@@ -678,16 +746,19 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
           title="Applicant Agreement &amp; Contact Information"
           description="The agreement below is the same one printed on the MASOM paper form."
         >
-          <div className="rounded-xl border border-border/70 bg-muted/30 p-5">
-            <p className="text-sm leading-relaxed text-muted-foreground">{AGREEMENT_TEXT}</p>
+          <div className="rounded-[14px] border border-sand-400/35 bg-white/80 p-4 sm:p-5">
+            <p className="text-sm leading-7 text-ink-500">{AGREEMENT_TEXT}</p>
           </div>
 
           <div className="mt-5 space-y-2">
-            <label htmlFor="pp-agreement" className={choiceCardClass}>
+            <label
+              htmlFor="pp-agreement"
+              className={`${choiceCardClass} bg-linear-to-r from-brand-100/70 to-brand-50/60`}
+            >
               <input
                 id="pp-agreement"
                 type="checkbox"
-                className="mt-0.5 size-4 shrink-0 rounded accent-brand-500"
+                className="mt-0.5 size-4 shrink-0 rounded accent-brand-700"
                 aria-invalid={errors.agreement ? true : undefined}
                 aria-describedby={errors.agreement ? "pp-agreement-error" : undefined}
                 {...register("agreement")}
@@ -711,7 +782,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 type="text"
                 autoComplete="name"
                 placeholder="Full name of the applicant(s)"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.applicantName ? true : undefined}
                 aria-describedby={errors.applicantName ? "pp-name-error" : undefined}
                 {...register("applicantName")}
@@ -729,7 +800,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 type="text"
                 autoComplete="off"
                 placeholder="Type your full name"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.electronicSignature ? true : undefined}
                 aria-describedby="pp-signature-hint"
                 {...register("electronicSignature")}
@@ -737,7 +808,10 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
               <p id="pp-signature-hint" className="text-xs text-muted-foreground">
                 Type your full name as your electronic signature.
               </p>
-              <FieldError id="pp-signature-error" message={errors.electronicSignature?.message} />
+              <FieldError
+                id="pp-signature-error"
+                message={errors.electronicSignature?.message}
+              />
             </div>
 
             <div className="space-y-2">
@@ -748,12 +822,17 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
               <Input
                 id="pp-agreement-date"
                 type="date"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.agreementDate ? true : undefined}
-                aria-describedby={errors.agreementDate ? "pp-agreement-date-error" : undefined}
+                aria-describedby={
+                  errors.agreementDate ? "pp-agreement-date-error" : undefined
+                }
                 {...register("agreementDate")}
               />
-              <FieldError id="pp-agreement-date-error" message={errors.agreementDate?.message} />
+              <FieldError
+                id="pp-agreement-date-error"
+                message={errors.agreementDate?.message}
+              />
             </div>
 
             <div className="space-y-2">
@@ -766,7 +845,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 type="tel"
                 autoComplete="tel"
                 placeholder="(312) 555-0190"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.phone ? true : undefined}
                 aria-describedby={errors.phone ? "pp-phone-error" : undefined}
                 {...register("phone")}
@@ -784,7 +863,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="h-11 rounded-xl px-4"
+                className={inputClass}
                 aria-invalid={errors.email ? true : undefined}
                 aria-describedby={errors.email ? "pp-email-error" : undefined}
                 {...register("email")}
@@ -797,7 +876,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
               read straight off the DOM and sent with the payload so the server
               can silently discard a bot submission. */}
           <div
-            className="absolute -left-[9999px] top-auto h-px w-px overflow-hidden"
+            className="absolute top-auto -left-[9999px] h-px w-px overflow-hidden"
             aria-hidden="true"
           >
             <label htmlFor="pp-website" className="sr-only">
@@ -822,7 +901,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
             <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
-                className="grid h-11 min-w-16 place-items-center rounded-xl border border-border/70 bg-muted/40 px-3 font-heading text-base font-bold tracking-wide text-foreground select-none"
+                className="grid h-11 w-24 shrink-0 place-items-center rounded-xl border border-brand-500/25 bg-brand-50 px-3 font-heading text-base font-bold tracking-wide text-ink-600 select-none"
               >
                 {captchaQuestion || "…"} =
               </span>
@@ -833,8 +912,10 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 autoComplete="off"
                 placeholder="Your answer"
                 value={captchaAnswer}
-                onChange={(event) => setCaptchaAnswer(event.target.value.replace(/[^\d]/g, ""))}
-                className="h-11 max-w-32 rounded-xl px-4"
+                onChange={(event) =>
+                  setCaptchaAnswer(event.target.value.replace(/[^\d]/g, ""))
+                }
+                className={`${inputClass} max-w-32`}
               />
               <Button
                 type="button"
@@ -850,17 +931,17 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col gap-4 border-t border-border/60 pt-7 sm:flex-row sm:items-center sm:justify-between">
+          <div className="-mx-5 mt-8 -mb-5 flex flex-col gap-4 border-t border-brand-500/20 bg-brand-50/80 px-5 py-5 sm:-mx-8 sm:-mb-8 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-6">
             <p className="text-xs leading-relaxed text-muted-foreground sm:max-w-md">
-              Submitting this application does not confirm or reserve the facility. MASOM will
-              review the request and contact you.
+              Submitting this application does not confirm or reserve the facility. MASOM
+              will review the request and contact you.
             </p>
             <Button
               type="submit"
               variant="cta"
               size="pill"
               disabled={pending}
-              className="h-12 w-full rounded-xl px-8 text-sm font-bold sm:w-auto"
+              className="h-12 w-full rounded-xl border-brand-700/20 bg-brand-700 bg-linear-to-br from-[color-mix(in_oklab,var(--color-brand-700)_80%,var(--color-ink-900))] to-[color-mix(in_oklab,var(--color-brand-700)_65%,var(--color-ink-900))] px-5 text-xs font-bold tracking-[0.08em] text-white shadow-sm transition-[filter,box-shadow] hover:bg-brand-700 hover:shadow-sm hover:brightness-105 focus-visible:border-brand-700 focus-visible:ring-brand-500/30 disabled:opacity-50 sm:w-auto sm:px-6"
             >
               {pending ? (
                 <>
@@ -886,25 +967,38 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
       */}
       <section
         aria-labelledby="pp-office-use-heading"
-        className="mt-6 rounded-2xl border border-dashed border-border bg-muted/30 p-6 sm:p-8"
+        className={`${sectionCardClass} mt-6 border-sand-400/40 bg-linear-to-br from-sand-400/15 to-[#f8f8f6]/95 sm:mt-7`}
       >
-        <div className="flex items-start gap-4">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-linear-to-r from-sand-400/65 via-sand-300/60 to-transparent"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-20 -right-20 size-52 rounded-full bg-sand-300/25 blur-3xl"
+        />
+        <div className="flex items-start gap-3.5 sm:gap-4">
           <span
             aria-hidden="true"
-            className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-sand-100 text-ink-800"
+            className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-sand-100 to-sand-300/70 text-ink-600 shadow-[inset_0_1px_2px_rgb(255_255_255/0.8)] ring-1 ring-sand-400/40"
           >
             <ClipboardListIcon className="size-4.5" />
           </span>
           <div className="min-w-0">
-            <h2
-              id="pp-office-use-heading"
-              className="font-heading text-xl leading-snug font-bold text-foreground"
-            >
-              For MASOM Office Use Only
-            </h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h2
+                id="pp-office-use-heading"
+                className="font-heading text-xl leading-snug font-bold tracking-tight text-ink-600"
+              >
+                For MASOM Office Use Only
+              </h2>
+              <span className="rounded-full border border-sand-400/35 bg-sand-100/70 px-2.5 py-1 text-[10px] font-bold tracking-[0.12em] text-ink-500 uppercase">
+                Internal
+              </span>
+            </div>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-              Received with thanks. These fields are completed internally by the MASOM office
-              after the application is reviewed — applicants do not fill them in.
+              Received with thanks. These fields are completed internally by the MASOM
+              office after the application is reviewed — applicants do not fill them in.
             </p>
           </div>
         </div>
@@ -923,7 +1017,7 @@ export function PrivateProgramForm({ defaultAgreementDate }: PrivateProgramFormP
                 value=""
                 placeholder={field.placeholder}
                 aria-label={`${field.label} — MASOM office use only`}
-                className="h-11 rounded-xl px-4"
+                className="h-11 rounded-xl border-sand-400/25 px-4 shadow-none disabled:bg-sand-100/50 disabled:text-ink-500 disabled:opacity-60"
               />
             </div>
           ))}

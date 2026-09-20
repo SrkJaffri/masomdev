@@ -77,7 +77,7 @@ export default function PrivateProgramApplicationPage() {
               Please complete every required section and review the MASOM guidelines before
               submitting.
             </p>
-            <p className="mt-6 rounded-full border border-sand-400/30 bg-white/5 px-5 py-2 text-xs leading-relaxed font-semibold tracking-wide text-sand-200">
+            <p className="mt-6 rounded-full border border-white/25 bg-white/10 px-5 py-2 text-xs leading-relaxed font-semibold tracking-wide text-white/90">
               Submitting this application does not automatically confirm or reserve the
               facility.
             </p>
