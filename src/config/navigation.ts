@@ -37,7 +37,7 @@ export const mainNavigation: NavItem[] = [
     children: [
       { label: "Online Forms", href: "/forms" },
       { label: "Membership Form", href: "/coming-soon" },
-      { label: "Application for Private Program", href: "/coming-soon" },
+      { label: "Application for Private Program", href: "/private-program-application" },
       { label: "Sura-Fatiha Request", href: "/coming-soon" },
     ],
   },

@@ -1,4 +1,5 @@
-import { DownloadIcon, ExternalLinkIcon, FileTextIcon } from "lucide-react";
+import { ArrowRightIcon, DownloadIcon, ExternalLinkIcon, FileTextIcon } from "lucide-react";
+import Link from "next/link";
 
 import { Container } from "@/components/layout/container";
 import { ParallaxBackground } from "@/components/website/parallax-background";
@@ -17,6 +18,8 @@ type FormDocument = {
   title: string;
   description: string;
   url: string;
+  /** Route of the online equivalent, when this form can be submitted on the site. */
+  applyUrl?: string;
 };
 
 /** Source: masom.com/forms — actual live PDF URLs (wp-content uploads). */
@@ -35,6 +38,7 @@ const documents: FormDocument[] = [
     title: "Private Program",
     description: "Private program application form",
     url: "https://masom.com/wp-content/uploads/2020/07/privateProgram.pdf",
+    applyUrl: "/private-program-application",
   },
 ];
 
@@ -113,11 +117,24 @@ export default function FormsPage() {
                   </p>
 
                   <div className="mt-7 flex flex-wrap items-center gap-3">
+                    {doc.applyUrl ? (
+                      <Link
+                        href={doc.applyUrl}
+                        className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                      >
+                        Apply Online
+                        <ArrowRightIcon className="size-4" aria-hidden="true" />
+                      </Link>
+                    ) : null}
                     <a
                       href={doc.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                      className={
+                        doc.applyUrl
+                          ? "inline-flex items-center gap-2 rounded-xl border border-border/70 px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-brand-500/50 hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                          : "inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                      }
                     >
                       View PDF
                       <ExternalLinkIcon className="size-4" aria-hidden="true" />

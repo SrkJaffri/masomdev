@@ -100,6 +100,37 @@ export function getContactEmailConfig(): ContactEmailConfig | null {
 }
 
 /**
+ * Server-only Resend configuration for Private Program applications.
+ *
+ * This feature owns its own addresses on purpose. The shared
+ * RESEND_FROM_EMAIL is donate@masom.com and is used by the contact and
+ * donation flows; private-program applications must come FROM and go TO the
+ * secretary, so overriding the global sender would silently re-address those
+ * unrelated emails. Both values default to secretary@masom.com, so no new
+ * environment variable is required to run the feature — set them only to
+ * change the addresses or to add a display name (e.g.
+ * "MASOM Secretary <secretary@masom.com>").
+ */
+export type PrivateProgramEmailConfig = {
+  apiKey: string;
+  from: string;
+  to: string;
+};
+
+export function getPrivateProgramEmailConfig(): PrivateProgramEmailConfig | null {
+  if (typeof window !== "undefined") return null;
+
+  const apiKey = process.env.RESEND_API_KEY?.trim() ?? "";
+  const from = process.env.PRIVATE_PROGRAM_FROM_EMAIL?.trim() || "secretary@masom.com";
+  const to = process.env.PRIVATE_PROGRAM_TO_EMAIL?.trim() || "secretary@masom.com";
+
+  // Only the key can be genuinely missing; from/to always resolve.
+  if (!apiKey) return null;
+
+  return { apiKey, from, to };
+}
+
+/**
  * Server-only Resend configuration for donation submissions. Returns null when
  * any variable is unset so the caller can fail with a friendly message instead
  * of crashing. Never exposes values to the browser.
