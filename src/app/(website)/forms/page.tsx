@@ -40,6 +40,11 @@ const documents: FormDocument[] = [
     url: "/pdf/privateProgram.pdf",
     applyUrl: "/private-program-application",
   },
+  {
+    title: "Marriage Form",
+    description: "MASOM marriage application form",
+    url: "/pdf/Marriage-form.pdf",
+  },
 ];
 
 export default function FormsPage() {
