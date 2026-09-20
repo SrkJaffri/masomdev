@@ -117,12 +117,13 @@ export default function PrivateProgramApplicationPage() {
       {/* Application form */}
       <section className="bg-background py-14 sm:py-18 lg:py-20">
         <Container>
+          {/* Rendered directly — no scroll reveal. The form is tall, so wrapping
+              it in <Reveal> left the whole application invisible until 20% of it
+              scrolled into view, which read as a missing form. */}
           <div className="mx-auto max-w-3xl">
-            <Reveal>
-              <PrivateProgramForm defaultAgreementDate={centralToday()} />
-            </Reveal>
+            <PrivateProgramForm defaultAgreementDate={centralToday()} />
 
-            <Reveal delay={0.1} className="mt-10">
+            <div className="mt-10">
               <p className="mx-auto max-w-xl text-center text-sm leading-relaxed text-muted-foreground">
                 Questions about this application? Please contact the Secretary of MASOM at{" "}
                 <a
@@ -133,7 +134,7 @@ export default function PrivateProgramApplicationPage() {
                 </a>
                 .
               </p>
-            </Reveal>
+            </div>
           </div>
         </Container>
       </section>
