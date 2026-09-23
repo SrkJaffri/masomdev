@@ -22,60 +22,75 @@ type PosterTab = "keep" | "upload" | "library";
  *
  * Modes are mutually exclusive in the DOM, so a stale file or hidden ref can
  * never be submitted together.
+ *
+ * The SELECTED file/library image is owned by the parent form (lifted state)
+ * so a failed submission — which re-renders but does not unmount this field —
+ * keeps both the selection and its preview intact. Tab state stays local; the
+ * whole field remounts (via the dialog key) when the dialog reopens.
  */
 export function ProgramPosterField({
   isEdit,
   hasCurrentPoster,
   currentPosterUrl,
   currentPosterAlt,
+  file,
+  onFileChange,
+  libraryItem,
+  onLibraryItemChange,
 }: {
   isEdit: boolean;
   hasCurrentPoster: boolean;
   currentPosterUrl: string | null;
   currentPosterAlt: string;
+  /** The picked upload file (lifted so errors don't lose it). */
+  file: File | null;
+  onFileChange: (file: File | null) => void;
+  /** The picked media-library image (lifted so errors don't lose it). */
+  libraryItem: ProgramPosterMedia | null;
+  onLibraryItemChange: (item: ProgramPosterMedia | null) => void;
 }) {
   // Default: create -> upload; edit with a poster -> keep current.
   const [tab, setTab] = useState<PosterTab>(
     isEdit && hasCurrentPoster ? "keep" : "upload",
   );
-  const [libraryItem, setLibraryItem] = useState<ProgramPosterMedia | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Free the object URL when the preview changes or the field unmounts.
+  // Mirror the lifted file into an object URL for the live preview, freeing
+  // the previous URL whenever the file changes or the field unmounts.
   useEffect(() => {
-    return () => {
-      if (uploadPreview) URL.revokeObjectURL(uploadPreview);
-    };
-  }, [uploadPreview]);
+    if (!file) {
+      setUploadPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setUploadPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   function switchTab(next: PosterTab) {
     if (next === tab) return;
     // Changing modes clears the other selection so only one is ever submitted.
-    if (next !== "library") setLibraryItem(null);
-    if (next !== "upload" && uploadInputRef.current) {
-      uploadInputRef.current.value = "";
+    if (next !== "library" && libraryItem) onLibraryItemChange(null);
+    if (next !== "upload") {
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+      if (file) onFileChange(null);
     }
-    setUploadPreview(null);
     setTab(next);
   }
 
-  function handleFileChange(file: File | null) {
-    if (uploadPreview) URL.revokeObjectURL(uploadPreview);
-    setUploadPreview(file ? URL.createObjectURL(file) : null);
-  }
-
-  const tabs: { id: PosterTab; label: string }[] = isEdit && hasCurrentPoster
-    ? [
-        { id: "keep", label: "Keep current" },
-        { id: "upload", label: "Replace by upload" },
-        { id: "library", label: "Choose from media library" },
-      ]
-    : [
-        { id: "upload", label: "Upload new" },
-        { id: "library", label: "Choose from media library" },
-      ];
+  const tabs: { id: PosterTab; label: string }[] =
+    isEdit && hasCurrentPoster
+      ? [
+          { id: "keep", label: "Keep current" },
+          { id: "upload", label: "Replace by upload" },
+          { id: "library", label: "Choose from media library" },
+        ]
+      : [
+          { id: "upload", label: "Upload new" },
+          { id: "library", label: "Choose from media library" },
+        ];
 
   // A replacement is pending only when the admin actually picked something.
   const replacing = Boolean(uploadPreview || libraryItem);
@@ -154,7 +169,7 @@ export function ProgramPosterField({
             name="poster"
             type="file"
             accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+            onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
           />
           {uploadPreview ? (
             <AdminThumb
@@ -212,7 +227,7 @@ export function ProgramPosterField({
         }}
         currentName={libraryItem?.name ?? null}
         onSelect={(item) => {
-          setLibraryItem(item);
+          onLibraryItemChange(item);
           setTab("library");
         }}
       />

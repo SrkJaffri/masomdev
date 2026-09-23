@@ -30,16 +30,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { createProgram, deleteProgram, updateProgram } from "@/features/programs/actions";
-import type { ProgramAdminItem } from "@/features/programs/types";
-import { idleResult } from "@/lib/cms/validation";
+import {
+  createProgram as createProgramBase,
+  deleteProgram as deleteProgramBase,
+  updateProgram as updateProgramBase,
+} from "@/features/programs/actions";
+import type { ProgramAdminItem, ProgramPosterMedia } from "@/features/programs/types";
+import {
+  STALE_SERVER_MESSAGE,
+  idleResult,
+  withSafeAction,
+  type ActionResult,
+} from "@/lib/cms/validation";
 
 import { ProgramPosterField } from "./program-poster-field";
 
 type DialogState =
   { mode: "create" } | { mode: "edit"; program: ProgramAdminItem } | null;
 
-type ProgramAction = typeof createProgram;
+type ProgramAction = ReturnType<typeof withSafeAction>;
+
+const createProgram = withSafeAction(createProgramBase);
+const updateProgram = withSafeAction(updateProgramBase);
+const deleteProgram = withSafeAction(deleteProgramBase);
 
 /** UTC-safe "Friday, Sep 4, 2026" for an ISO date string. */
 function formatDate(iso: string | null): string {
@@ -56,9 +69,27 @@ function formatDate(iso: string | null): string {
 }
 
 /**
+ * True when the client-side action wrapper reported a stale server/deployment
+ * (framework-level Server Action failure caught before the action ran).
+ */
+function isStaleServerResult(result: ActionResult): boolean {
+  return (
+    result.status === "error" &&
+    result.message === STALE_SERVER_MESSAGE
+  );
+}
+
+/**
  * Owns the action state so it can be remounted (via the dialog's key) per open.
  * Without the remount, useActionState keeps the previous "success" result and a
  * stale effect immediately closes the next dialog before it is visible.
+ *
+ * Entered values are CONTROLLED (via `values` + onInput defaults): React 19
+ * resets uncontrolled form fields after every form action completes, so an
+ * uncontrolled form would wipe the admin's entries on every validation error.
+ * The server echoes the submitted values back in the error result; this form
+ * adopts them as the new defaults. Poster selection lives here (lifted state)
+ * so a failed submission keeps the picked file/library image.
  */
 function ProgramForm({
   isEdit,
@@ -77,6 +108,39 @@ function ProgramForm({
     if (result.status === "success") onClose();
   }, [result, onClose]);
 
+  // ----- Entered-value preservation (React 19) -----
+  // React resets uncontrolled form fields when a form action completes, so all
+  // fields are CONTROLLED here: state is initialized from the program (or the
+  // create defaults) and, after a validation error, the server's echo of what
+  // was actually submitted is adopted. Errors can repeat any number of times
+  // without losing the admin's entries.
+  const [values, setValues] = useState(() => ({
+    title: program?.title ?? "",
+    description: program?.description ?? "",
+    start_date: program?.start_date ?? "",
+    end_date: program?.end_date ?? "",
+    start_time: program?.start_time?.slice(0, 5) ?? "",
+    end_time: program?.end_time?.slice(0, 5) ?? "",
+    location: program?.location ?? "",
+    link_url: program?.link_url ?? "",
+    sort_order: String(program?.sort_order ?? 0),
+    is_published: program ? program.is_published : true,
+  }));
+
+  useEffect(() => {
+    if (result.status === "error" && result.values) {
+      setValues((current) => ({ ...current, ...result.values }));
+    }
+  }, [result]);
+
+  const set = (key: keyof typeof values) => (value: string | boolean) =>
+    setValues((current) => ({ ...current, [key]: value }));
+
+  // Poster selection — lifted so a failed submission keeps the pick + preview.
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterLibraryItem, setPosterLibraryItem] =
+    useState<ProgramPosterMedia | null>(null);
+
   return (
     <form action={formAction} className="space-y-4">
       {isEdit ? <input type="hidden" name="id" value={program!.id} /> : null}
@@ -86,7 +150,8 @@ function ProgramForm({
         <Input
           id="title"
           name="title"
-          defaultValue={program?.title ?? ""}
+          value={values.title}
+          onChange={(event) => set("title")(event.target.value)}
           placeholder="e.g. Alwidai Majalis"
           required
         />
@@ -98,7 +163,8 @@ function ProgramForm({
           id="description"
           name="description"
           rows={3}
-          defaultValue={program?.description ?? ""}
+          value={values.description}
+          onChange={(event) => set("description")(event.target.value)}
         />
       </div>
 
@@ -109,7 +175,8 @@ function ProgramForm({
             id="start_date"
             name="start_date"
             type="date"
-            defaultValue={program?.start_date ?? ""}
+            value={values.start_date}
+            onChange={(event) => set("start_date")(event.target.value)}
             required
           />
         </div>
@@ -119,7 +186,8 @@ function ProgramForm({
             id="end_date"
             name="end_date"
             type="date"
-            defaultValue={program?.end_date ?? ""}
+            value={values.end_date}
+            onChange={(event) => set("end_date")(event.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -128,7 +196,8 @@ function ProgramForm({
             id="start_time"
             name="start_time"
             type="time"
-            defaultValue={program?.start_time?.slice(0, 5) ?? ""}
+            value={values.start_time}
+            onChange={(event) => set("start_time")(event.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -137,14 +206,20 @@ function ProgramForm({
             id="end_time"
             name="end_time"
             type="time"
-            defaultValue={program?.end_time?.slice(0, 5) ?? ""}
+            value={values.end_time}
+            onChange={(event) => set("end_time")(event.target.value)}
           />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="location">Location (optional)</Label>
-        <Input id="location" name="location" defaultValue={program?.location ?? ""} />
+        <Input
+          id="location"
+          name="location"
+          value={values.location}
+          onChange={(event) => set("location")(event.target.value)}
+        />
       </div>
 
       <ProgramPosterField
@@ -152,6 +227,10 @@ function ProgramForm({
         hasCurrentPoster={Boolean(program?.poster_path)}
         currentPosterUrl={program?.previewUrl ?? null}
         currentPosterAlt={program?.title ?? "Current poster"}
+        file={posterFile}
+        onFileChange={setPosterFile}
+        libraryItem={posterLibraryItem}
+        onLibraryItemChange={setPosterLibraryItem}
       />
 
       <div className="space-y-2">
@@ -162,7 +241,8 @@ function ProgramForm({
           type="url"
           inputMode="url"
           placeholder="https://…"
-          defaultValue={program?.link_url ?? ""}
+          value={values.link_url}
+          onChange={(event) => set("link_url")(event.target.value)}
         />
       </div>
 
@@ -173,24 +253,47 @@ function ProgramForm({
           name="sort_order"
           type="number"
           min={0}
-          defaultValue={program?.sort_order ?? 0}
+          value={values.sort_order}
+          onChange={(event) => set("sort_order")(event.target.value)}
           className="w-28"
         />
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Hidden input guarantees a false is submitted when unchecked —
+            otherwise FormData would omit the key and the action's
+            boolFromForm would default the echo to false. */}
+        <input type="hidden" name="is_published" value={values.is_published ? "true" : "false"} />
         <Switch
           id="is_published"
-          name="is_published"
-          defaultChecked={program ? program.is_published : true}
+          checked={values.is_published}
+          onCheckedChange={(checked) => set("is_published")(checked)}
         />
         <Label htmlFor="is_published">Published (show on the website)</Label>
       </div>
 
       {result.status === "error" ? (
-        <p role="alert" className="text-sm font-medium text-destructive">
-          {result.message}
-        </p>
+        <div
+          role="alert"
+          className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2"
+        >
+          <p className="text-sm font-medium text-destructive">{result.message}</p>
+          {result.correlationId ? (
+            <p className="text-xs text-muted-foreground">
+              Reference: {result.correlationId}
+            </p>
+          ) : null}
+          {isStaleServerResult(result) ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Reload page
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       <DialogFooter>
@@ -207,13 +310,7 @@ function ProgramForm({
   );
 }
 
-function ProgramDialog({
-  state,
-  onClose,
-}: {
-  state: DialogState;
-  onClose: () => void;
-}) {
+function ProgramDialog({ state, onClose }: { state: DialogState; onClose: () => void }) {
   const isEdit = state?.mode === "edit";
   const program = isEdit ? state.program : null;
   const action = isEdit ? updateProgram : createProgram;
